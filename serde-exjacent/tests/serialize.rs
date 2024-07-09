@@ -10,7 +10,7 @@ fn json<T: serde::Serialize>(value: T) -> String {
 
 #[test]
 fn serialize_enum() {
-	#[derive(serde_exjacent::Serialize)]
+	#[derive(serde_exjacent::Serialize, serde_exjacent::Deserialize)]
 	enum MyEnum {
 		Unit,
 		UnitTuple(),
@@ -32,7 +32,7 @@ fn serialize_enum() {
 
 #[test]
 fn serialize_enum_generic() {
-	#[derive(serde_exjacent::Serialize)]
+	#[derive(serde_exjacent::Serialize, serde_exjacent::Deserialize)]
 	enum MyEnum<T> {
 		Unit,
 		UnitTuple(),
@@ -44,11 +44,11 @@ fn serialize_enum_generic() {
 			field_b: u8,
 		}
 	}
-	assert!(json(MyEnum::<()>::Unit) == r#"{"type":"unit"}"#);
-	assert!(json(MyEnum::<()>::UnitTuple()) == r#"{"type":"unit_tuple"}"#);
+	assert!(json(MyEnum::Unit::<()>) == r#"{"type":"unit"}"#);
+	assert!(json(MyEnum::UnitTuple::<()>()) == r#"{"type":"unit_tuple"}"#);
 	assert!(json(MyEnum::NewType("hello")) == r#"{"type":"new_type","new_type":"hello"}"#);
 	assert!(json(MyEnum::Tuple(3, "world")) == r#"{"type":"tuple","tuple":[3,"world"]}"#);
-	assert!(json(MyEnum::<()>::EmptyStruct {}) == r#"{"type":"empty_struct","empty_struct":{}}"#);
+	assert!(json(MyEnum::EmptyStruct::<()> {}) == r#"{"type":"empty_struct","empty_struct":{}}"#);
 	assert!(json(MyEnum::Struct { field_a: "bye", field_b: 7 }) == r#"{"type":"struct","struct":{"field_a":"bye","field_b":7}}"#);
 }
 

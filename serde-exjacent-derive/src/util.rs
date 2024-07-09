@@ -52,8 +52,8 @@ pub fn parse_enum_item(tokens: TokenStream) -> Result<syn::ItemEnum, syn::Error>
 	Err(syn::Error::new(error_span, "serde_exjacent: expected an enum"))
 }
 
-pub fn add_lifetime(generics: &syn::Generics) -> (syn::Generics, syn::Lifetime, Option<TokenStream>) {
-	let lifetime = match allocate_unused_lifetime(generics) {
+pub fn add_lifetime(generics: &syn::Generics, hint: &str) -> (syn::Generics, syn::Lifetime, Option<TokenStream>) {
+	let lifetime = match allocate_unused_lifetime(generics, hint) {
 		Ok(x) => x,
 		Err(e) => return (generics.clone(), syn::Lifetime::new("'a", Span::call_site()), Some(e.into_compile_error())),
 	};
@@ -65,7 +65,10 @@ pub fn add_lifetime(generics: &syn::Generics) -> (syn::Generics, syn::Lifetime, 
 	(generics, lifetime, None)
 }
 
-fn allocate_unused_lifetime(generics: &syn::Generics) -> Result<String, syn::Error> {
+fn allocate_unused_lifetime(generics: &syn::Generics, hint: &str) -> Result<String, syn::Error> {
+	if !has_lifetime(generics, hint) {
+		return Ok(hint.into());
+	}
 	for lifetime in 'a'..='z' {
 		let lifetime = lifetime.to_string();
 		if !has_lifetime(generics, &lifetime) {
@@ -91,4 +94,56 @@ fn has_lifetime(generics: &syn::Generics, lifetime: &str) -> bool {
 		}
 	}
 	false
+}
+
+/// Check if a type uses any of the given generic arguments.
+pub fn type_uses_generic(ty: &syn::Type, generics: &syn::Generics) -> bool {
+	struct Visit<'a> {
+		generics: &'a syn::Generics,
+		found: bool,
+	}
+	impl syn::visit::Visit<'_> for Visit<'_> {
+		fn visit_path(&mut self, item: &syn::Path) {
+			for param in &self.generics.params {
+				if let syn::GenericParam::Type(param) = param {
+					if item.is_ident(&param.ident) {
+						self.found = true;
+						return;
+					}
+				}
+			}
+			syn::visit::visit_path(self, item)
+		}
+		fn visit_lifetime(&mut self, item: &syn::Lifetime) {
+			for param in &self.generics.params {
+				if let syn::GenericParam::Lifetime(param) = param {
+					if item.ident == param.lifetime.ident {
+						self.found = true;
+						return;
+					}
+				}
+			}
+			syn::visit::visit_lifetime(self, item)
+
+		}
+		fn visit_const_param(&mut self, item: &syn::ConstParam) {
+			for param in &self.generics.params {
+				if let syn::GenericParam::Const(param) = param {
+					if item.ident == param.ident {
+						self.found = true;
+						return;
+					}
+				}
+			}
+			syn::visit::visit_const_param(self, item)
+		}
+	}
+
+	let mut visitor = Visit {
+		generics,
+		found: false,
+	};
+
+	syn::visit::Visit::visit_type(&mut visitor, ty);
+	visitor.found
 }
