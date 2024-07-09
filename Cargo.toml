@@ -1,0 +1,6 @@
+[workspace]
+resolver = "2"
+members = [
+	"serde-exjacent",
+	"serde-exjacent-derive",
+]

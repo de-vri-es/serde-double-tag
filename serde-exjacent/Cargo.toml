@@ -1,0 +1,19 @@
+[package]
+name = "serde-exjacent"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+derive = ["dep:serde-exjacent-derive"]
+schemars = ["dep:schemars"]
+
+[dependencies]
+schemars = { version = "0.8.21", features = ["preserve_order"], optional = true }
+serde = "1.0.203"
+serde-exjacent-derive = { version = "=0.1.0", optional = true, path = "../serde-exjacent-derive" }
+serde_json = { version = "1.0.118", features = ["preserve_order"] }
+
+[dev-dependencies]
+serde-exjacent = { path = ".", features = ["derive"] }
+
+assert2 = "0.3.14"
