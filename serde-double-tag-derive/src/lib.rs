@@ -1,26 +1,25 @@
-// mod config_enum;
 mod deserialize;
 mod util;
 mod serialize;
 
 /// Get the crate name to use for the main library crate.
 fn anchors() -> Anchors {
-    Anchors::new(syn::parse_quote!(::serde_exjacent))
+	Anchors::new(syn::parse_quote!(::serde_double_tag))
 }
 
 #[proc_macro_derive(Deserialize)]
 pub fn derive_deserialize(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    deserialize::impl_deserialize_enum(&anchors(), tokens.into()).into()
+	deserialize::impl_deserialize_enum(&anchors(), tokens.into()).into()
 }
 
 #[proc_macro_derive(Serialize)]
 pub fn derive_serialize(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    serialize::impl_serialize_enum(&anchors(), tokens.into()).into()
+	serialize::impl_serialize_enum(&anchors(), tokens.into()).into()
 }
 
 #[proc_macro_derive(JsonSchema)]
 pub fn derive_json_schema(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    todo!();
+	todo!();
 }
 
 struct Anchors {

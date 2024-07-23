@@ -186,19 +186,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-exjacent"
+name = "serde-double-tag"
 version = "0.1.0"
 dependencies = [
  "assert2",
  "schemars",
  "serde",
- "serde-exjacent",
- "serde-exjacent-derive",
+ "serde-double-tag",
+ "serde-double-tag-derive",
  "serde_json",
 ]
 
 [[package]]
-name = "serde-exjacent-derive"
+name = "serde-double-tag-derive"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",

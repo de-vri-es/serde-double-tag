@@ -10,7 +10,7 @@ fn json<T: serde::Serialize>(value: T) -> String {
 
 #[test]
 fn serialize_enum() {
-	#[derive(serde_exjacent::Serialize, serde_exjacent::Deserialize)]
+	#[derive(serde_double_tag::Serialize, serde_double_tag::Deserialize)]
 	enum MyEnum {
 		Unit,
 		UnitTuple(),
@@ -32,7 +32,7 @@ fn serialize_enum() {
 
 #[test]
 fn serialize_enum_generic() {
-	#[derive(serde_exjacent::Serialize, serde_exjacent::Deserialize)]
+	#[derive(serde_double_tag::Serialize, serde_double_tag::Deserialize)]
 	enum MyEnum<T> {
 		Unit,
 		UnitTuple(),
@@ -54,7 +54,7 @@ fn serialize_enum_generic() {
 
 #[test]
 fn serialize_enum_generic_lifetime() {
-	#[derive(serde_exjacent::Serialize)]
+	#[derive(serde_double_tag::Serialize)]
 	enum MyEnum<'a, T> {
 		Unit,
 		UnitTuple(),

@@ -209,7 +209,33 @@ fn deserialize_tuple_variant(anchors: &Anchors, item: &syn::ItemEnum, variant_na
 }
 
 fn deserialize_struct_variant(anchors: &Anchors, item: &syn::ItemEnum, variant_name: &syn::Ident, variant_tag: &str, fields: &syn::FieldsNamed) -> TokenStream {
-	syn::Error::new_spanned(variant_name, "deserialize for struct variants not implemented yet").to_compile_error()
+	let serde = &anchors.serde;
+	let serde_str = quote::ToTokens::to_token_stream(serde).to_string();
+	let internal = &anchors.internal;
+
+	let enum_name = &item.ident;
+	let field_declarations = &fields.named;
+	let field_name: Vec<_> = fields.named.iter().map(|x| x.ident.as_ref().unwrap()).collect();
+	let mapped_field_name: Vec<_> = field_name.iter().map(|x| syn::Ident::new(&format!("field_{x}"), x.span())).collect();
+	let (impl_generics, type_generics, where_clause) = item.generics.split_for_impl();
+	quote! {
+		#[derive(#serde::Deserialize)]
+		#[serde(crate = #serde_str)]
+		struct Fields #impl_generics #where_clause {
+			#field_declarations
+
+			#[serde(default)]
+			__serde_double_tag_phantom_enum: ::core::marker::PhantomData<fn() -> #enum_name #type_generics>,
+		}
+		let value: Fields #type_generics = #internal::deserialize_variant(#variant_tag, map)?;
+		let Fields {
+			#( #field_name: #mapped_field_name , )*
+			__serde_double_tag_phantom_enum: _,
+		} = value;
+		::core::result::Result::Ok(#enum_name::#variant_name {
+			#( #field_name: #mapped_field_name , )*
+		})
+	}
 }
 
 fn make_where_clause(anchors: &Anchors, item: &syn::ItemEnum, de_lifetime: &syn::Lifetime) -> Option<syn::WhereClause> {

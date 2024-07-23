@@ -49,7 +49,7 @@ pub fn parse_enum_item(tokens: TokenStream) -> Result<syn::ItemEnum, syn::Error>
 		syn::Item::Verbatim(x) => x.span(),
 		_ => item.span(),
 	};
-	Err(syn::Error::new(error_span, "serde_exjacent: expected an enum"))
+	Err(syn::Error::new(error_span, "serde_double_tag: expected an enum"))
 }
 
 pub fn add_lifetime(generics: &syn::Generics, hint: &str) -> (syn::Generics, syn::Lifetime, Option<TokenStream>) {

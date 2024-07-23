@@ -1,6 +1,6 @@
 [package]
-name = "serde-exjacent-derive"
-description = "proc macros for the `serde-exjacent` crate"
+name = "serde-double-tag-derive"
+description = "proc macros for the `serde-double-tag` crate"
 version = "0.1.0"
 edition = "2021"
 

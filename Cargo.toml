@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-	"serde-exjacent",
-	"serde-exjacent-derive",
+	"serde-double-tag",
+	"serde-double-tag-derive",
 ]

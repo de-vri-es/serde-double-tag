@@ -1,19 +1,19 @@
 [package]
-name = "serde-exjacent"
+name = "serde-double-tag"
 version = "0.1.0"
 edition = "2021"
 
 [features]
-derive = ["dep:serde-exjacent-derive"]
+derive = ["dep:serde-double-tag-derive"]
 schemars = ["dep:schemars"]
 
 [dependencies]
 schemars = { version = "0.8.21", features = ["preserve_order"], optional = true }
-serde = "1.0.203"
-serde-exjacent-derive = { version = "=0.1.0", optional = true, path = "../serde-exjacent-derive" }
+serde = { version = "1.0.203", features = ["derive"] }
+serde-double-tag-derive = { version = "=0.1.0", optional = true, path = "../serde-double-tag-derive" }
 serde_json = { version = "1.0.118", features = ["preserve_order"] }
 
 [dev-dependencies]
-serde-exjacent = { path = ".", features = ["derive"] }
+serde-double-tag = { path = ".", features = ["derive"] }
 
 assert2 = "0.3.14"
