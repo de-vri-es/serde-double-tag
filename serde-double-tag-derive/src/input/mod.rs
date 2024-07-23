@@ -1,5 +1,8 @@
 mod attrs;
 pub use attrs::*;
+use proc_macro2::Span;
+
+use crate::Context;
 
 pub struct Enum {
 	pub attr: EnumAttributes,
@@ -10,11 +13,56 @@ pub struct Enum {
 	pub variants: syn::punctuated::Punctuated<Variant, syn::token::Comma>,
 }
 
-struct Variant {
+impl Enum {
+	pub fn parse2(context: &mut Context, tokens: proc_macro2::TokenStream) -> Result<Self, ()> {
+		let item: syn::Item = syn::parse2(tokens)
+			.map_err(|e| context.syn_error(e))?;
+		match item {
+			syn::Item::Enum(item) => Ok(Self::from_syn(context, item)),
+			_ => {
+				context.error(crate::util::item_token_span(&item), "this serde represebntation is only available for enums");
+				Err(())
+			}
+		}
+	}
+
+	fn from_syn(context: &mut Context, input: syn::ItemEnum) -> Self {
+		Self {
+			attr: EnumAttributes::from_syn(context, input.attrs),
+			vis: input.vis,
+			enum_token: input.enum_token,
+			ident: input.ident,
+			generics: input.generics,
+			variants: Variant::from_punctuated(context, input.variants),
+		}
+	}
+}
+
+pub struct Variant {
 	pub attr: VariantAttributes,
 	pub ident: syn::Ident,
 	pub fields: Fields,
-	pub discriminant: Option<Discriminant>,
+}
+
+impl Variant {
+	fn from_syn(context: &mut Context, input: syn::Variant) -> Self {
+		Self {
+			attr: VariantAttributes::from_syn(context, input.attrs),
+			ident: input.ident,
+			fields: Fields::from_syn(context, input.fields),
+		}
+	}
+
+	fn from_punctuated(context: &mut Context, input: syn::punctuated::Punctuated<syn::Variant, syn::token::Comma>) -> syn::punctuated::Punctuated<Self, syn::token::Comma> {
+		input
+			.into_pairs()
+			.map(|elem| {
+				let (variant, punct) = elem.into_tuple();
+				let variant = Self::from_syn(context, variant);
+				syn::punctuated::Pair::new(variant, punct)
+			})
+			.collect()
+	}
 }
 
 pub enum Fields {
@@ -23,9 +71,87 @@ pub enum Fields {
 	Struct(StructFields),
 }
 
+impl Fields {
+	fn from_syn(context: &mut Context, input: syn::Fields) -> Self {
+		match input {
+			syn::Fields::Unit => Self::Unit,
+			syn::Fields::Named(fields) => Self::Struct(StructFields::from_syn(context, fields)),
+			syn::Fields::Unnamed(fields) => Self::Tuple(TupleFields::from_syn(context, fields)),
+		}
+	}
+
+	pub fn iter_types(&self) -> FieldTypes<'_> {
+		match self {
+			Self::Unit => FieldTypes::Unit,
+			Self::Tuple(x) => FieldTypes::Tuple(x.fields.iter()),
+			Self::Struct(x) => FieldTypes::Struct(x.fields.iter()),
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		match self {
+			Self::Unit => 0,
+			Self::Tuple(x) => x.len(),
+			Self::Struct(x) => x.len(),
+		}
+	}
+
+	pub fn is_empty(&self) -> bool {
+		match self {
+			Self::Unit => true,
+			Self::Tuple(x) => x.is_empty(),
+			Self::Struct(x) => x.is_empty(),
+		}
+	}
+}
+
 pub struct TupleFields {
 	pub paren: syn::token::Paren,
 	pub fields: syn::punctuated::Punctuated<TupleField, syn::token::Comma>,
+}
+
+impl TupleFields {
+	fn from_syn(context: &mut Context, input: syn::FieldsUnnamed) -> Self {
+		let fields = input.unnamed
+			.into_pairs()
+			.enumerate()
+			.map(|(index, elem)| {
+				let (field, punct) = elem.into_tuple();
+				let field = TupleField::from_syn(context, index, field);
+				syn::punctuated::Pair::new(field, punct)
+			})
+			.collect();
+		Self {
+			paren: input.paren_token,
+			fields,
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.fields.len()
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.fields.is_empty()
+	}
+}
+
+pub struct TupleField {
+	pub index: usize,
+	pub attrs: Vec<syn::Attribute>,
+	pub vis: syn::Visibility,
+	pub ty: syn::Type,
+}
+
+impl TupleField {
+	fn from_syn(_context: &mut Context, index: usize, input: syn::Field) -> Self {
+		Self {
+			index,
+			attrs: input.attrs,
+			vis: input.vis,
+			ty: input.ty,
+		}
+	}
 }
 
 pub struct StructFields {
@@ -33,10 +159,43 @@ pub struct StructFields {
 	pub fields: syn::punctuated::Punctuated<StructField, syn::token::Comma>,
 }
 
-pub struct TupleField {
-	pub attrs: Vec<syn::Attribute>,
-	pub vis: syn::Visibility,
-	pub ty: syn::Type,
+impl  StructFields {
+	fn from_syn(context: &mut Context, input: syn::FieldsNamed) -> Self {
+		let fields = input.named
+			.into_pairs()
+			.map(|elem| {
+				let (field, punct) = elem.into_tuple();
+				let field = StructField::from_syn(context, field);
+				syn::punctuated::Pair::new(field, punct)
+			})
+			.collect();
+		Self {
+			brace: input.brace_token,
+			fields,
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.fields.len()
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.fields.is_empty()
+	}
+}
+
+impl quote::ToTokens for StructFields {
+	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		let Self {
+			brace,
+			fields,
+		} = self;
+		brace.surround(tokens, |tokens| {
+			for field in fields {
+				field.to_tokens(tokens);
+			}
+		})
+	}
 }
 
 pub struct StructField {
@@ -47,92 +206,124 @@ pub struct StructField {
 	pub ty: syn::Type,
 }
 
+impl StructField {
+	fn from_syn(context: &mut Context, input: syn::Field) -> Self {
+		let ident = match input.ident {
+			Some(x) => x,
+			None => {
+				context.spanned_error(&input.ty, "struct field must have an identifier");
+				syn::Ident::new("missing_identifier", Span::call_site())
+			},
+		};
+		let colon = match input.colon_token {
+			Some(x) => x,
+			None => {
+				context.spanned_error(&input.ty, "struct field must have a colon (`:`) to separate the identifier and the type");
+				syn::token::Colon(Span::call_site())
+			},
+		};
+		Self {
+			attrs: input.attrs,
+			vis: input.vis,
+			ident,
+			colon,
+			ty: input.ty,
+		}
+	}
+}
+
+impl quote::ToTokens for StructField {
+	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		let Self {
+			attrs,
+			vis,
+			ident,
+			colon,
+			ty,
+		} = self;
+		for attr in attrs {
+			attr.to_tokens(tokens);
+		}
+		vis.to_tokens(tokens);
+		ident.to_tokens(tokens);
+		colon.to_tokens(tokens);
+		ty.to_tokens(tokens);
+	}
+}
+
 pub struct Discriminant {
 	pub eq: syn::token::Eq,
 	pub expr: syn::Expr,
 }
 
-impl syn::parse::Parse for Enum {
-	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+impl Discriminant {
+	fn from_syn(input: (syn::token::Eq, syn::Expr)) -> syn::Result<Self> {
+		let (eq, expr) = input;
 		Ok(Self {
-			attr: input.parse()?,
-			vis: input.parse()?,
-			enum_token: input.parse()?,
-			ident: input.parse()?,
-			generics: input.parse()?,
-			variants: syn::punctuated::Punctuated::parse_terminated(input)?,
+			eq,
+			expr,
 		})
 	}
 }
 
-impl syn::parse::Parse for Variant {
-	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-		let attr = input.parse()?;
-		let ident = input.parse()?;
-		let fields = input.parse()?;
-		let discriminant = if input.peek(syn::token::Eq) {
-			Some(input.parse()?)
-		} else {
-			None
-		};
-		Ok(Self {
-			attr,
-			ident,
-			fields,
-			discriminant,
-		})
-	}
+pub enum FieldTypes<'a> {
+	Unit,
+	Tuple(syn::punctuated::Iter<'a, TupleField>),
+	Struct(syn::punctuated::Iter<'a, StructField>),
 }
 
-impl syn::parse::Parse for Fields {
-	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-		if input.peek(syn::token::Comma) || input.is_empty() {
-			Ok(Self::Unit)
-		} else if input.peek(syn::token::Paren) {
-			let content;
-			Ok(Self::Tuple(TupleFields {
-				paren: syn::parenthesized!(content in input),
-				fields: syn::punctuated::Punctuated::parse_terminated(&content)?,
-			}))
-		} else if input.peek(syn::token::Brace) {
-			let content;
-			Ok(Self::Struct(StructFields {
-				brace: syn::braced!(content in input),
-				fields: syn::punctuated::Punctuated::parse_terminated(&content)?,
-			}))
-		} else {
-			Err(input.error("expected a unit variant, tuple variant or struct variant"))
+impl<'a> Iterator for FieldTypes<'a> {
+	type Item = &'a syn::Type;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		match self {
+			Self::Unit => None,
+			Self::Tuple(x) => x.next().map(|x| &x.ty),
+			Self::Struct(x) => x.next().map(|x| &x.ty),
+		}
+	}
+
+	fn nth(&mut self, n: usize) -> Option<Self::Item> {
+		match self {
+			Self::Unit => None,
+			Self::Tuple(x) => x.nth(n).map(|x| &x.ty),
+			Self::Struct(x) => x.nth(n).map(|x| &x.ty),
+		}
+	}
+
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		match self {
+			Self::Unit => (0, Some(0)),
+			Self::Tuple(x) => x.size_hint(),
+			Self::Struct(x) => x.size_hint(),
 		}
 	}
 }
 
-impl syn::parse::Parse for TupleField {
-	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-		Ok(Self {
-			attrs: syn::Attribute::parse_outer(input)?,
-			vis: input.parse()?,
-			ty: input.parse()?,
-		})
+impl std::iter::ExactSizeIterator for FieldTypes<'_> {
+	fn len(&self) -> usize {
+		match self {
+			Self::Unit => 0,
+			Self::Tuple(x) => x.len(),
+			Self::Struct(x) => x.len(),
+		}
 	}
 }
 
-impl syn::parse::Parse for StructField {
-	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-		Ok(Self {
-			attrs: syn::Attribute::parse_outer(input)?,
-			vis: input.parse()?,
-			ident: input.parse()?,
-			colon: input.parse()?,
-			ty: input.parse()?,
-		})
+impl std::iter::DoubleEndedIterator for FieldTypes<'_> {
+	fn next_back(&mut self) -> Option<Self::Item> {
+		match self {
+			Self::Unit => None,
+			Self::Tuple(x) => x.next_back().map(|x| &x.ty),
+			Self::Struct(x) => x.next_back().map(|x| &x.ty),
+		}
 	}
-}
 
-impl syn::parse::Parse for Discriminant {
-	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-		Ok(Self {
-			eq: input.parse()?,
-			expr: input.parse()?,
-		})
+	fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+		match self {
+			Self::Unit => None,
+			Self::Tuple(x) => x.nth_back(n).map(|x| &x.ty),
+			Self::Struct(x) => x.nth_back(n).map(|x| &x.ty),
+		}
 	}
 }

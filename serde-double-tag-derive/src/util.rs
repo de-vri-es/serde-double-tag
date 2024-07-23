@@ -28,6 +28,28 @@ pub fn to_snake_case(data: &str) -> String {
 	output
 }
 
+pub fn item_token_span(item: &syn::Item) -> Span {
+	match item {
+		syn::Item::Enum(x) => x.enum_token.span,
+		syn::Item::Const(x) => x.const_token.span,
+		syn::Item::ExternCrate(x) => x.extern_token.span,
+		syn::Item::Fn(x) => x.sig.fn_token.span,
+		syn::Item::ForeignMod(x) => x.abi.extern_token.span,
+		syn::Item::Impl(x) => x.impl_token.span,
+		syn::Item::Macro(x) => x.mac.path.span(),
+		syn::Item::Mod(x) => x.mod_token.span,
+		syn::Item::Static(x) => x.static_token.span,
+		syn::Item::Struct(x) => x.struct_token.span,
+		syn::Item::Trait(x) => x.trait_token.span,
+		syn::Item::TraitAlias(x) => x.trait_token.span,
+		syn::Item::Type(x) => x.type_token.span,
+		syn::Item::Union(x) => x.union_token.span,
+		syn::Item::Use(x) => x.use_token.span,
+		syn::Item::Verbatim(x) => x.span(),
+		_ => item.span(),
+	}
+}
+
 pub fn parse_enum_item(tokens: TokenStream) -> Result<syn::ItemEnum, syn::Error> {
 	let item = syn::parse2(tokens)?;
 	let error_span = match item {

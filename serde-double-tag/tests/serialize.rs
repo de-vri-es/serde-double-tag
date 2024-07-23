@@ -11,6 +11,8 @@ fn json<T: serde::Serialize>(value: T) -> String {
 #[test]
 fn serialize_enum() {
 	#[derive(serde_double_tag::Serialize, serde_double_tag::Deserialize)]
+	#[serde(rename_all = "snake_case")]
+	#[serde(deny_unknown_fields)]
 	enum MyEnum {
 		Unit,
 		UnitTuple(),

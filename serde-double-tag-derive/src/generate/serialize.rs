@@ -5,12 +5,7 @@ use syn::spanned::Spanned;
 use crate::{util, Context};
 
 /// Generate code that implement the serde `Serialize` trait for an enum using the double-tag format.
-pub fn impl_serialize_enum(context: &Context, tokens: TokenStream) -> TokenStream {
-	let item = match util::parse_enum_item(tokens) {
-		Ok(x) => x,
-		Err(e) => return e.into_compile_error(),
-	};
-
+pub fn impl_serialize_enum(context: &mut Context, item: crate::input::Enum) -> TokenStream {
 	let serde = &context.serde;
 	let enum_name = &item.ident;
 
@@ -18,7 +13,7 @@ pub fn impl_serialize_enum(context: &Context, tokens: TokenStream) -> TokenStrea
 		let variant_name = &variant.ident;
 		let snake_case = util::to_snake_case(&variant_name.to_string());
 		match &variant.fields {
-			syn::Fields::Unit => quote! {
+			crate::input::Fields::Unit => quote! {
 				Self::#variant_name => {
 					let mut map = #serde::ser::Serializer::serialize_map(serializer, Some(1))?;
 					#serde::ser::SerializeMap::serialize_key(&mut map, "type")?;
@@ -26,11 +21,11 @@ pub fn impl_serialize_enum(context: &Context, tokens: TokenStream) -> TokenStrea
 					#serde::ser::SerializeMap::end(map)
 				},
 			},
-			syn::Fields::Named(fields) => {
-				let field_name: Vec<_> = fields.named.iter().map(|x| x.ident.as_ref().unwrap()).collect();
+			crate::input::Fields::Struct(fields) => {
+				let field_name: Vec<_> = fields.fields.iter().map(|x| &x.ident).collect();
 				let field_name_str: Vec<_> = field_name.iter().map(|x| x.to_string()).collect();
 				let mapped_field_name: Vec<_> = field_name.iter().map(|name| syn::Ident::new(&format!("field_{name}"), name.span())).collect();
-				let field_count = fields.named.len();
+				let field_count = fields.fields.len();
 
 				let (field_generics, field_lifetime, error) = util::add_lifetime(&item.generics, "a");
 				let (_impl_generics, enum_type_generics, enum_where_clause) = item.generics.split_for_impl();
@@ -70,7 +65,7 @@ pub fn impl_serialize_enum(context: &Context, tokens: TokenStream) -> TokenStrea
 					}
 				}
 			},
-			syn::Fields::Unnamed(fields) => match fields.unnamed.len() {
+			crate::input::Fields::Tuple(fields) => match fields.len() {
 				0 => quote! {
 					Self::#variant_name() => {
 						let mut map = #serde::ser::Serializer::serialize_map(serializer, Some(1))?;
@@ -89,12 +84,11 @@ pub fn impl_serialize_enum(context: &Context, tokens: TokenStream) -> TokenStrea
 						#serde::ser::SerializeMap::end(map)
 					},
 				},
-				_ => {
-					let mapped_field_name: Vec<_> = fields.unnamed.iter()
+				field_count => {
+					let mapped_field_name: Vec<_> = fields.fields.iter()
 						.enumerate()
 						.map(|(i, field)| syn::Ident::new(&format!("field_{i}"), field.ty.span()))
 						.collect();
-					let field_count = fields.unnamed.len();
 					let (field_generics, field_lifetime, error) = util::add_lifetime(&item.generics, "a");
 					let (_impl_generics, enum_type_generics, enum_where_clause) = item.generics.split_for_impl();
 					let (fields_impl_generics, fields_type_generics, _where_clause) = field_generics.split_for_impl();
@@ -150,14 +144,13 @@ pub fn impl_serialize_enum(context: &Context, tokens: TokenStream) -> TokenStrea
 	}
 }
 
-fn make_where_clause(context: &Context, item: &syn::ItemEnum) -> Option<syn::WhereClause> {
+fn make_where_clause(context: &Context, item: &crate::input::Enum) -> Option<syn::WhereClause> {
 	let serde = &context.serde;
 
 	let mut predicates = Vec::<syn::WherePredicate>::new();
 	for variant in &item.variants {
-		for field in &variant.fields {
-			if util::type_uses_generic(&field.ty, &item.generics) {
-				let ty = &field.ty;
+		for ty in variant.fields.iter_types() {
+			if util::type_uses_generic(ty, &item.generics) {
 				predicates.push(syn::parse_quote! {
 					#ty: #serde::Serialize
 				})

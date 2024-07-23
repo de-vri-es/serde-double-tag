@@ -1,7 +1,6 @@
-mod deserialize;
 mod util;
-mod serialize;
 mod input;
+mod generate;
 
 fn crate_name() -> syn::Path {
 	let mut segments = syn::punctuated::Punctuated::new();
@@ -42,7 +41,7 @@ impl Context {
 
 
 	fn error(&mut self, span: proc_macro2::Span, message: impl std::fmt::Display) {
-		self.errors.push(syn::Error::new(span, &format!("serde_double_tag: {message}")))
+		self.errors.push(syn::Error::new(span, format_args!("serde_double_tag: {message}")))
 	}
 
 	fn call_site_error(&mut self, message: impl std::fmt::Display) {
@@ -50,7 +49,7 @@ impl Context {
 	}
 
 	fn spanned_error<T: quote::ToTokens>(&mut self, object: &T, message: impl std::fmt::Display) {
-		self.errors.push(syn::Error::new_spanned(object, &format!("serde_double_tag: {message}")))
+		self.errors.push(syn::Error::new_spanned(object, format_args!("serde_double_tag: {message}")))
 	}
 
 	fn syn_error(&mut self, error: syn::Error) {
@@ -65,21 +64,27 @@ impl Context {
 	}
 }
 
-#[proc_macro_derive(Deserialize)]
+#[proc_macro_derive(Deserialize, attributes(serde))]
 pub fn derive_deserialize(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let mut context = Context::new(crate_name());
-	let output = deserialize::impl_deserialize_enum(&mut context, tokens.into());
+	let output = match input::Enum::parse2(&mut context, tokens.into()) {
+		Ok(input) => generate::impl_deserialize_enum(&mut context, input),
+		Err(()) => proc_macro2::TokenStream::new(),
+	};
 	context.collect_errors(output).into()
 }
 
-#[proc_macro_derive(Serialize)]
+#[proc_macro_derive(Serialize, attributes(serde))]
 pub fn derive_serialize(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let mut context = Context::new(crate_name());
-	let output = serialize::impl_serialize_enum(&mut context, tokens.into());
+	let output = match input::Enum::parse2(&mut context, tokens.into()) {
+		Ok(input) => generate::impl_serialize_enum(&mut context, input),
+		Err(()) => proc_macro2::TokenStream::new(),
+	};
 	context.collect_errors(output).into()
 }
 
-#[proc_macro_derive(JsonSchema)]
+#[proc_macro_derive(JsonSchema, attributes(serde))]
 pub fn derive_json_schema(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	todo!();
 }
