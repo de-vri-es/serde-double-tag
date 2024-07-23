@@ -2,16 +2,16 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
 
-use crate::{util, Anchors};
+use crate::{util, Context};
 
 /// Generate code that implement the serde `Serialize` trait for an enum using the double-tag format.
-pub fn impl_serialize_enum(anchors: &Anchors, tokens: TokenStream) -> TokenStream {
+pub fn impl_serialize_enum(context: &Context, tokens: TokenStream) -> TokenStream {
 	let item = match util::parse_enum_item(tokens) {
 		Ok(x) => x,
 		Err(e) => return e.into_compile_error(),
 	};
 
-	let serde = &anchors.serde;
+	let serde = &context.serde;
 	let enum_name = &item.ident;
 
 	let match_arms = item.variants.iter().map(|variant| {
@@ -35,7 +35,7 @@ pub fn impl_serialize_enum(anchors: &Anchors, tokens: TokenStream) -> TokenStrea
 				let (field_generics, field_lifetime, error) = util::add_lifetime(&item.generics, "a");
 				let (_impl_generics, enum_type_generics, enum_where_clause) = item.generics.split_for_impl();
 				let (fields_impl_generics, fields_type_generics, _where_clause) = field_generics.split_for_impl();
-				let fields_where_clause = make_where_clause(anchors, &item);
+				let fields_where_clause = make_where_clause(context, &item);
 
 				quote! {
 					Self::#variant_name { .. } => {
@@ -98,7 +98,7 @@ pub fn impl_serialize_enum(anchors: &Anchors, tokens: TokenStream) -> TokenStrea
 					let (field_generics, field_lifetime, error) = util::add_lifetime(&item.generics, "a");
 					let (_impl_generics, enum_type_generics, enum_where_clause) = item.generics.split_for_impl();
 					let (fields_impl_generics, fields_type_generics, _where_clause) = field_generics.split_for_impl();
-					let fields_where_clause = make_where_clause(anchors, &item);
+					let fields_where_clause = make_where_clause(context, &item);
 
 					quote! {
 						Self::#variant_name ( .. ) => {
@@ -137,7 +137,7 @@ pub fn impl_serialize_enum(anchors: &Anchors, tokens: TokenStream) -> TokenStrea
 	});
 
 	let (impl_generics, type_generics, _where_clause) = item.generics.split_for_impl();
-	let where_clause = make_where_clause(anchors, &item);
+	let where_clause = make_where_clause(context, &item);
 
 	quote! {
 		impl #impl_generics  #serde::Serialize for #enum_name #type_generics #where_clause {
@@ -150,8 +150,8 @@ pub fn impl_serialize_enum(anchors: &Anchors, tokens: TokenStream) -> TokenStrea
 	}
 }
 
-fn make_where_clause(anchors: &Anchors, item: &syn::ItemEnum) -> Option<syn::WhereClause> {
-	let serde = &anchors.serde;
+fn make_where_clause(context: &Context, item: &syn::ItemEnum) -> Option<syn::WhereClause> {
+	let serde = &context.serde;
 
 	let mut predicates = Vec::<syn::WherePredicate>::new();
 	for variant in &item.variants {

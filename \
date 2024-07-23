@@ -2,18 +2,24 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
 
-use crate::{util, Context};
+use crate::{util, Anchors};
 
 /// Generate code that implement the serde `Serialize` trait for an enum using the double-tag format.
-pub fn impl_deserialize_enum(context: &Context, tokens: TokenStream) -> TokenStream {
-	let item = match util::parse_enum_item(tokens) {
+pub fn impl_deserialize_enum(anchors: &Anchors, tokens: TokenStream) -> TokenStream {
+	let item = match syn::parse2(tokens) {
 		Ok(x) => x,
 		Err(e) => return e.into_compile_error(),
 	};
+	let errors = serde_derive_internals::Ctxt::new();
+	let input = match crate::parse::Input::parse_deserialize(&errors, &item) {
+		None => return errors.check().unwrap_err().into_compile_error(),
+		Some(x) => x,
+	};
 
-	let internal = &context.internal;
-	let serde = &context.serde;
+	serde_derive_internals::ast::Container::from_ast(&errors, &item, serde_derive_internals::Derive::Deserialize);
 
+	let internal = &anchors.internal;
+	let serde = &anchors.serde;
 	let enum_name = &item.ident;
 
 	let variant_name: Vec<_> = item.variants.iter()
@@ -22,15 +28,15 @@ pub fn impl_deserialize_enum(context: &Context, tokens: TokenStream) -> TokenStr
 		.map(|x| util::to_snake_case(&x.ident.to_string())).collect();
 	let variant_deserialize = item.variants.iter()
 		.zip(&variant_tag)
-		.map(|(variant, tag_value)| deserialize_fields(context, &item, variant, tag_value));
+		.map(|(variant, tag_value)| deserialize_fields(anchors, &item, variant, tag_value));
 
 	let (_impl_generics, type_generics, _where_clause) = item.generics.split_for_impl();
 	let (de_generics, de_lifetime, error) = util::add_lifetime(&item.generics, "de");
-	let where_clause = make_where_clause(context, &item, &de_lifetime);
+	let where_clause = make_where_clause(anchors, &item, &de_lifetime);
 	let (impl_generics, _type_generics, _where_clause) = de_generics.split_for_impl();
 
 	let tag_name = "type";
-	let tag_enum = make_tag_enum(context, &item);
+	let tag_enum = make_tag_enum(anchors, &item);
 
 	quote! {
 		#error
@@ -75,8 +81,8 @@ pub fn impl_deserialize_enum(context: &Context, tokens: TokenStream) -> TokenStr
 	}
 }
 
-fn make_tag_enum(context: &Context, item: &syn::ItemEnum) -> TokenStream {
-	let serde = &context.serde;
+fn make_tag_enum(anchors: &Anchors, item: &syn::ItemEnum) -> TokenStream {
+	let serde = &anchors.serde;
 
 	let variant_name: Vec<_> = item.variants.iter().map(|x| &x.ident).collect();
 	let tag_value: Vec<_> = item.variants.iter().map(|x| util::to_snake_case(&x.ident.to_string())).collect();
@@ -118,16 +124,16 @@ fn make_tag_enum(context: &Context, item: &syn::ItemEnum) -> TokenStream {
 	}
 }
 
-fn deserialize_fields(context: &Context, item: &syn::ItemEnum, variant: &syn::Variant, variant_tag: &str) -> TokenStream {
+fn deserialize_fields(anchors: &Anchors, item: &syn::ItemEnum, variant: &syn::Variant, variant_tag: &str) -> TokenStream {
 	match &variant.fields {
-		syn::Fields::Unit => deserialize_unit_variant(context, item, &variant.ident, variant_tag),
-		syn::Fields::Unnamed(fields) => deserialize_tuple_variant(context, item, &variant.ident, variant_tag, fields),
-		syn::Fields::Named(fields) => deserialize_struct_variant(context, item, &variant.ident, variant_tag, fields),
+		syn::Fields::Unit => deserialize_unit_variant(anchors, item, &variant.ident, variant_tag),
+		syn::Fields::Unnamed(fields) => deserialize_tuple_variant(anchors, item, &variant.ident, variant_tag, fields),
+		syn::Fields::Named(fields) => deserialize_struct_variant(anchors, item, &variant.ident, variant_tag, fields),
 	}
 }
 
-fn deserialize_unit_variant(context: &Context, item: &syn::ItemEnum, variant_name: &syn::Ident, variant_tag: &str) -> TokenStream {
-	let internal = &context.internal;
+fn deserialize_unit_variant(anchors: &Anchors, item: &syn::ItemEnum, variant_name: &syn::Ident, variant_tag: &str) -> TokenStream {
+	let internal = &anchors.internal;
 	let enum_name = &item.ident;
 	quote! {
 		let _value: () = #internal::deserialize_variant_optional(#variant_tag, map)?;
@@ -135,9 +141,9 @@ fn deserialize_unit_variant(context: &Context, item: &syn::ItemEnum, variant_nam
 	}
 }
 
-fn deserialize_tuple_variant(context: &Context, item: &syn::ItemEnum, variant_name: &syn::Ident, variant_tag: &str, fields: &syn::FieldsUnnamed) -> TokenStream {
-	let internal = &context.internal;
-	let serde = &context.serde;
+fn deserialize_tuple_variant(anchors: &Anchors, item: &syn::ItemEnum, variant_name: &syn::Ident, variant_tag: &str, fields: &syn::FieldsUnnamed) -> TokenStream {
+	let internal = &anchors.internal;
+	let serde = &anchors.serde;
 
 	let enum_name = &item.ident;
 
@@ -166,7 +172,7 @@ fn deserialize_tuple_variant(context: &Context, item: &syn::ItemEnum, variant_na
 
 			let (de_generics, de_lifetime, error) = util::add_lifetime(&item.generics, "de");
 			let (de_impl_generics, _type_generics, _where_clause) = de_generics.split_for_impl();
-			let de_where_clause = make_where_clause(context, item, &de_lifetime);
+			let de_where_clause = make_where_clause(anchors, item, &de_lifetime);
 
 			let expecting = format!("a tuple of {n} elements");
 
@@ -208,10 +214,10 @@ fn deserialize_tuple_variant(context: &Context, item: &syn::ItemEnum, variant_na
 	}
 }
 
-fn deserialize_struct_variant(context: &Context, item: &syn::ItemEnum, variant_name: &syn::Ident, variant_tag: &str, fields: &syn::FieldsNamed) -> TokenStream {
-	let serde = &context.serde;
+fn deserialize_struct_variant(anchors: &Anchors, item: &syn::ItemEnum, variant_name: &syn::Ident, variant_tag: &str, fields: &syn::FieldsNamed) -> TokenStream {
+	let serde = &anchors.serde;
 	let serde_str = quote::ToTokens::to_token_stream(serde).to_string();
-	let internal = &context.internal;
+	let internal = &anchors.internal;
 
 	let enum_name = &item.ident;
 	let field_declarations = &fields.named;
@@ -238,8 +244,8 @@ fn deserialize_struct_variant(context: &Context, item: &syn::ItemEnum, variant_n
 	}
 }
 
-fn make_where_clause(context: &Context, item: &syn::ItemEnum, de_lifetime: &syn::Lifetime) -> Option<syn::WhereClause> {
-	let serde = &context.serde;
+fn make_where_clause(anchors: &Anchors, item: &syn::ItemEnum, de_lifetime: &syn::Lifetime) -> Option<syn::WhereClause> {
+	let serde = &anchors.serde;
 
 	let mut predicates = Vec::<syn::WherePredicate>::new();
 	for variant in &item.variants {
