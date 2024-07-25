@@ -1,11 +1,11 @@
-mod attrs;
-pub use attrs::*;
+pub mod attributes;
+
 use proc_macro2::Span;
 
 use crate::Context;
 
 pub struct Enum {
-	pub attr: EnumAttributes,
+	pub attr: attributes::EnumAttributes,
 	pub vis: syn::Visibility,
 	pub enum_token: syn::token::Enum,
 	pub ident: syn::Ident,
@@ -28,7 +28,7 @@ impl Enum {
 
 	fn from_syn(context: &mut Context, input: syn::ItemEnum) -> Self {
 		Self {
-			attr: EnumAttributes::from_syn(context, input.attrs),
+			attr: attributes::EnumAttributes::from_syn(context, input.attrs),
 			vis: input.vis,
 			enum_token: input.enum_token,
 			ident: input.ident,
@@ -39,7 +39,7 @@ impl Enum {
 }
 
 pub struct Variant {
-	pub attr: VariantAttributes,
+	pub attr: attributes::VariantAttributes,
 	pub ident: syn::Ident,
 	pub fields: Fields,
 }
@@ -47,7 +47,7 @@ pub struct Variant {
 impl Variant {
 	fn from_syn(context: &mut Context, input: syn::Variant) -> Self {
 		Self {
-			attr: VariantAttributes::from_syn(context, input.attrs),
+			attr: attributes::VariantAttributes::from_syn(context, input.attrs),
 			ident: input.ident,
 			fields: Fields::from_syn(context, input.fields),
 		}

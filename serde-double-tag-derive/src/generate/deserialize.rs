@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 
 use crate::{util, Context};
@@ -72,43 +72,16 @@ pub fn impl_deserialize_enum(context: &mut Context, item: crate::input::Enum) ->
 
 fn make_tag_enum(context: &Context, item: &crate::input::Enum) -> TokenStream {
 	let serde = &context.serde;
-
+	let serde_str = serde.to_token_stream().to_string();
 	let variant_name: Vec<_> = item.variants.iter().map(|x| &x.ident).collect();
-	let tag_value: Vec<_> = item.variants.iter().map(|x| util::to_snake_case(&x.ident.to_string())).collect();
-
-	let tag_expecting = make_expecting("the string", &tag_value);
+	let rename_all = &item.attr.rename_all;
 
 	quote! {
+		#[derive(#serde::Deserialize)]
+		#[serde(crate = #serde_str)]
+		#rename_all
 		enum Tag {
 			#(#variant_name,)*
-		}
-
-		impl<'de> #serde::Deserialize<'de> for Tag {
-			fn deserialize<D: #serde::Deserializer<'de>>(deserializer: D) -> ::core::result::Result<Self, D::Error> {
-				struct Visitor;
-
-				impl<'de> #serde::de::Visitor<'de> for Visitor {
-					type Value = Tag;
-
-					fn expecting(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-						f.write_str(#tag_expecting)
-					}
-
-					fn visit_str<E: #serde::de::Error>(self, value: &::core::primitive::str) -> ::core::result::Result<Self::Value, E> {
-						match value {
-							#(
-								#tag_value => ::core::result::Result::Ok(Tag::#variant_name),
-							)*
-							value => ::core::result::Result::Err(E::invalid_value(
-								#serde::de::Unexpected::Str(value),
-								&#tag_expecting
-							))
-						}
-					}
-				}
-
-				deserializer.deserialize_str(Visitor)
-			}
 		}
 	}
 }
@@ -117,7 +90,7 @@ fn deserialize_fields(context: &Context, item: &crate::input::Enum, variant: &cr
 	match &variant.fields {
 		crate::input::Fields::Unit => deserialize_unit_variant(context, item, &variant.ident, variant_tag),
 		crate::input::Fields::Tuple(fields) => deserialize_tuple_variant(context, item, &variant.ident, variant_tag, fields),
-		crate::input::Fields::Struct(fields) => deserialize_struct_variant(context, item, &variant.ident, variant_tag, fields),
+		crate::input::Fields::Struct(fields) => deserialize_struct_variant(context, item, &variant, variant_tag, fields),
 	}
 }
 
@@ -202,23 +175,55 @@ fn deserialize_tuple_variant(context: &Context, item: &crate::input::Enum, varia
 	}
 }
 
-fn deserialize_struct_variant(context: &Context, item: &crate::input::Enum, variant_name: &syn::Ident, variant_tag: &str, fields: &crate::input::StructFields) -> TokenStream {
+fn deserialize_struct_variant(context: &Context, item: &crate::input::Enum, variant: &crate::input::Variant, variant_tag: &str, fields: &crate::input::StructFields) -> TokenStream {
 	let serde = &context.serde;
 	let serde_str = quote::ToTokens::to_token_stream(serde).to_string();
 	let internal = &context.internal;
 
 	let enum_name = &item.ident;
+	let variant_name = &variant.ident;
 	let field_declarations = &fields.fields;
 	let field_name: Vec<_> = fields.fields.iter().map(|x| &x.ident).collect();
 	let mapped_field_name: Vec<_> = field_name.iter().map(|x| syn::Ident::new(&format!("field_{x}"), x.span())).collect();
 	let (impl_generics, type_generics, where_clause) = item.generics.split_for_impl();
+
+	let mut serde_attributes = variant.attr.clone();
+	serde_attributes.rename = None;
+	let rename = variant.ident.to_string();
+	let rename_all = match &variant.attr.rename_all {
+		Some(x) => Some(x.to_token_stream()),
+		None => item.attr.rename_all_fields.as_ref()
+			.map(|x| {
+				let case_convert = x.value;
+				quote!(#[serde(rename_all = #case_convert)])
+			}),
+	};
+	let bound = variant.attr.bound.as_ref()
+		.or(item.attr.bound.as_ref());
+	let deny_unknown_fields = &item.attr.deny_unknown_fields;
+	let expecting = &item.attr.expecting;
+
 	quote! {
+		#[derive(serde::Deserialize)]
+		#deny_unknown_fields
+		#bound
+		#expecting
+		struct Repr #impl_generics #where_clause {
+			tag: str,
+			data: Fields #type_generics,
+		}
+
 		#[derive(#serde::Deserialize)]
 		#[serde(crate = #serde_str)]
+		#[serde(rename = #rename)]
+		#rename_all
+		#deny_unknown_fields
+		#bound
+		#expecting
 		struct Fields #impl_generics #where_clause {
 			#field_declarations
 
-			#[serde(default)]
+			#[serde(skip, default)]
 			__serde_double_tag_phantom_enum: ::core::marker::PhantomData<fn() -> #enum_name #type_generics>,
 		}
 		let value: Fields #type_generics = #internal::deserialize_variant(#variant_tag, map)?;
@@ -238,7 +243,7 @@ fn make_where_clause(context: &Context, item: &crate::input::Enum, de_lifetime: 
 	let mut predicates = Vec::<syn::WherePredicate>::new();
 	for variant in &item.variants {
 		for ty in variant.fields.iter_types() {
-			if util::type_uses_generic(&ty, &item.generics) {
+			if util::type_uses_generic(ty, &item.generics) {
 				predicates.push(syn::parse_quote! {
 					#ty: #serde::Deserialize<#de_lifetime>
 				})
