@@ -204,15 +204,6 @@ fn deserialize_struct_variant(context: &Context, item: &crate::input::Enum, vari
 	let expecting = &item.attr.expecting;
 
 	quote! {
-		#[derive(serde::Deserialize)]
-		#deny_unknown_fields
-		#bound
-		#expecting
-		struct Repr #impl_generics #where_clause {
-			tag: str,
-			data: Fields #type_generics,
-		}
-
 		#[derive(#serde::Deserialize)]
 		#[serde(crate = #serde_str)]
 		#[serde(rename = #rename)]

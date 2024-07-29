@@ -1,6 +1,8 @@
 use proc_macro2::{Span, TokenStream};
-use quote::ToTokens;
 use syn::spanned::Spanned;
+
+mod case;
+pub use case::RenameRule;
 
 /// Convert a string to snake case.
 ///
