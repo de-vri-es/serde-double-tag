@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
 
@@ -170,4 +172,106 @@ pub fn type_uses_generic(ty: &syn::Type, generics: &syn::Generics) -> bool {
 
 	syn::visit::Visit::visit_type(&mut visitor, ty);
 	visitor.found
+}
+
+fn remove_unused_generics<'a, Types>(input: &syn::Generics, types: impl Iterator<Item = &'a syn::Type>) -> syn::Generics
+where
+	Types: Iterator<Item = &'a syn::Type> + Clone + Copy,
+{
+	let used_idents = collect_used_idents(types);
+	for param in &input.params {
+		if types.any(|ty| type_uses_generic_param(ty, param)) {
+			used.push(param)
+		} else {
+			unused.push(param);
+		}
+	}
+}
+
+struct UsedGenerics<'a> {
+	idents: BTreeSet<&'a syn::Ident>,
+	lifetimes: BTreeSet<&'a syn::Lifetime>,
+}
+
+impl<'ast> syn::visit::Visit<'ast> for UsedGenerics<'ast> {
+	fn visit_ident(&mut self, i: &'ast proc_macro2::Ident) {
+		self.idents.insert(i);
+	}
+
+	fn visit_lifetime(&mut self, i: &'ast syn::Lifetime) {
+		self.lifetimes.insert(i);
+	}
+}
+
+fn collect_used_idents<'a>(types: impl Iterator<Item = &'a syn::Type>) -> UsedGenerics<'a> {
+	let mut used = UsedGenerics {
+		idents: BTreeSet::new(),
+		lifetimes: BTreeSet::new(),
+	};
+
+	for ty in types {
+		syn::visit::Visit::visit_type(&mut used, ty);
+	}
+
+	used
+}
+
+fn generic_param_is_used(ty: &syn::Type, param: &syn::GenericParam) -> bool {
+	match param {
+		syn::GenericParam::Lifetime(param) => type_uses_lifetime(ty, &param.lifetime),
+		syn::GenericParam::Type(param) => type_uses_generic_ident(ty, &param.ident),
+		syn::GenericParam::Const(param) => type_uses_generic_ident(ty, &param.ident),
+	}
+}
+
+fn type_uses_generic_param(ty: &syn::Type, param: &syn::GenericParam) -> bool {
+	match param {
+		syn::GenericParam::Lifetime(param) => type_uses_lifetime(ty, &param.lifetime),
+		syn::GenericParam::Type(param) => type_uses_generic_ident(ty, &param.ident),
+		syn::GenericParam::Const(param) => type_uses_generic_ident(ty, &param.ident),
+	}
+}
+
+fn type_uses_lifetime(ty: &syn::Type, lifetime: &syn::Lifetime) -> bool {
+	struct Visit<'a> {
+		wanted: &'a syn::Lifetime,
+		found: bool,
+	}
+
+	impl<'ast> syn::visit::Visit<'ast> for Visit<'_> {
+		fn visit_lifetime(&mut self, i: &'ast syn::Lifetime) {
+			if i.ident == self.wanted.ident {
+				self.found = true;
+			}
+		}
+	}
+
+	let mut visit = Visit {
+		wanted: lifetime,
+		found: false,
+	};
+	syn::visit::Visit::visit_type(&mut visit, ty);
+	visit.found
+}
+
+fn type_uses_generic_ident(ty: &syn::Type, generic_type: &syn::Ident) -> bool {
+	struct Visit<'a> {
+		wanted: &'a syn::Ident,
+		found: bool,
+	}
+
+	impl<'ast> syn::visit::Visit<'ast> for Visit<'_> {
+		fn visit_ident(&mut self, i: &'ast proc_macro2::Ident) {
+			if i == self.wanted {
+				self.found = true;
+			}
+		}
+	}
+
+	let mut visit = Visit {
+		wanted: generic_type,
+		found: false,
+	};
+	syn::visit::Visit::visit_type(&mut visit, ty);
+	visit.found
 }

@@ -1,4 +1,4 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 
 use crate::Context;
 
@@ -87,6 +87,31 @@ pub struct KeyValueArg<K, V> {
 	pub key: K,
 	pub eq: syn::token::Eq,
 	pub value: V,
+}
+
+impl<K, V> KeyValueArg<K, V> {
+	pub fn new_call_site(attr_path: &str, value: V) -> Self
+	where
+		K: Default,
+	{
+		Self {
+			pound: Default::default(),
+			bracket: Default::default(),
+			attr_path: syn::parse_str(attr_path).unwrap(),
+			delimiter: syn::MacroDelimiter::Paren(Default::default()),
+			key: K::default(),
+			eq: Default::default(),
+			value,
+		}
+	}
+
+	pub fn new_str(attr_path: &str, value: &str) -> Self
+	where
+		K: Default,
+		V: syn::parse::Parse,
+	{
+		Self::new_call_site(attr_path, syn::parse_str(value).unwrap())
+	}
 }
 
 impl<K: quote::ToTokens, V: quote::ToTokens> quote::ToTokens for KeyValueArg<K, V> {

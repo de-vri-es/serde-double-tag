@@ -70,22 +70,6 @@ pub fn impl_deserialize_enum(context: &mut Context, item: crate::input::Enum) ->
 	}
 }
 
-fn make_tag_enum(context: &Context, item: &crate::input::Enum) -> TokenStream {
-	let serde = &context.serde;
-	let serde_str = serde.to_token_stream().to_string();
-	let variant_name: Vec<_> = item.variants.iter().map(|x| &x.ident).collect();
-	let rename_all = &item.attr.rename_all;
-
-	quote! {
-		#[derive(#serde::Deserialize)]
-		#[serde(crate = #serde_str)]
-		#rename_all
-		enum Tag {
-			#(#variant_name,)*
-		}
-	}
-}
-
 fn deserialize_fields(context: &Context, item: &crate::input::Enum, variant: &crate::input::Variant, variant_tag: &str) -> TokenStream {
 	match &variant.fields {
 		crate::input::Fields::Unit => deserialize_unit_variant(context, item, &variant.ident, variant_tag),

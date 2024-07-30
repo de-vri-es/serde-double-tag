@@ -120,8 +120,8 @@ pub mod keyword {
 
 #[derive(Clone, Copy)]
 pub struct RenameRule {
-	rule: crate::util::RenameRule,
-	span: Span,
+	pub rule: crate::util::RenameRule,
+	pub span: Span,
 }
 
 impl syn::parse::Parse for RenameRule {
