@@ -1,143 +1,41 @@
 use proc_macro2::TokenStream;
-use quote::quote;
-use syn::spanned::Spanned;
+use quote::{quote, ToTokens};
 
 use crate::{util, Context};
 
 /// Generate code that implement the serde `Serialize` trait for an enum using the double-tag format.
 pub fn impl_serialize_enum(context: &mut Context, item: crate::input::Enum) -> TokenStream {
-	let serde = &context.serde;
 	let enum_name = &item.ident;
 
-	let match_arms = item.variants.iter().map(|variant| {
-		let variant_name = &variant.ident;
-		let snake_case = util::to_snake_case(&variant_name.to_string());
-		match &variant.fields {
-			crate::input::Fields::Unit => quote! {
-				Self::#variant_name => {
-					let mut map = #serde::ser::Serializer::serialize_map(serializer, Some(1))?;
-					#serde::ser::SerializeMap::serialize_key(&mut map, "type")?;
-					#serde::ser::SerializeMap::serialize_value(&mut map, #snake_case)?;
-					#serde::ser::SerializeMap::end(map)
+	let match_arms: Vec<_> = item.variants.iter()
+		.map(|variant| {
+			let repr = make_repr_struct(context, &item, variant);
+			let variant_name = &variant.ident;
+			let fields = fields_expression(&variant.fields);
+			let serde = &context.serde;
+
+			quote! {
+				Self::#variant_name #fields => {
+					#repr
+					let repr = Repr {
+						tag: Tag::#variant_name,
+						data: Data #fields,
+					};
+					#serde::Serialize::serialize(&repr, serializer)
 				},
-			},
-			crate::input::Fields::Struct(fields) => {
-				let field_name: Vec<_> = fields.fields.iter().map(|x| &x.ident).collect();
-				let field_name_str: Vec<_> = field_name.iter().map(|x| x.to_string()).collect();
-				let mapped_field_name: Vec<_> = field_name.iter().map(|name| syn::Ident::new(&format!("field_{name}"), name.span())).collect();
-				let field_count = fields.fields.len();
-
-				let (field_generics, field_lifetime, error) = util::add_lifetime(&item.generics, "a");
-				let (_impl_generics, enum_type_generics, enum_where_clause) = item.generics.split_for_impl();
-				let (fields_impl_generics, fields_type_generics, _where_clause) = field_generics.split_for_impl();
-				let fields_where_clause = make_where_clause(context, &item);
-
-				quote! {
-					Self::#variant_name { .. } => {
-						#error
-						struct Fields #fields_type_generics #enum_where_clause (&#field_lifetime #enum_name #enum_type_generics);
-						impl #fields_impl_generics #serde::ser::Serialize for Fields #fields_type_generics #fields_where_clause {
-							fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
-							where
-								S: #serde::Serializer,
-							{
-								match &self.0 {
-									#enum_name::#variant_name { #(#field_name: #mapped_field_name),* } => {
-										let mut map = #serde::ser::Serializer::serialize_map(serializer, Some(#field_count))?;
-										#(
-											#serde::ser::SerializeMap::serialize_key(&mut map, #field_name_str)?;
-											#serde::ser::SerializeMap::serialize_value(&mut map, #mapped_field_name)?;
-										)*
-										#serde::ser::SerializeMap::end(map)
-									},
-									// We already know `self` is the right variant, so we can not get here.
-									_ => ::core::unreachable!(),
-								}
-							}
-						}
-
-						let mut map = #serde::ser::Serializer::serialize_map(serializer, Some(2))?;
-						#serde::ser::SerializeMap::serialize_key(&mut map, "type")?;
-						#serde::ser::SerializeMap::serialize_value(&mut map, #snake_case)?;
-						#serde::ser::SerializeMap::serialize_key(&mut map, #snake_case)?;
-						#serde::ser::SerializeMap::serialize_value(&mut map, &Fields(self))?;
-						#serde::ser::SerializeMap::end(map)
-					}
-				}
-			},
-			crate::input::Fields::Tuple(fields) => match fields.len() {
-				0 => quote! {
-					Self::#variant_name() => {
-						let mut map = #serde::ser::Serializer::serialize_map(serializer, Some(1))?;
-						#serde::ser::SerializeMap::serialize_key(&mut map, "type")?;
-						#serde::ser::SerializeMap::serialize_value(&mut map, #snake_case)?;
-						#serde::ser::SerializeMap::end(map)
-					},
-				},
-				1 => quote! {
-					Self::#variant_name(value) => {
-						let mut map = #serde::ser::Serializer::serialize_map(serializer, Some(2))?;
-						#serde::ser::SerializeMap::serialize_key(&mut map, "type")?;
-						#serde::ser::SerializeMap::serialize_value(&mut map, #snake_case)?;
-						#serde::ser::SerializeMap::serialize_key(&mut map, #snake_case)?;
-						#serde::ser::SerializeMap::serialize_value(&mut map, value)?;
-						#serde::ser::SerializeMap::end(map)
-					},
-				},
-				field_count => {
-					let mapped_field_name: Vec<_> = fields.fields.iter()
-						.enumerate()
-						.map(|(i, field)| syn::Ident::new(&format!("field_{i}"), field.ty.span()))
-						.collect();
-					let (field_generics, field_lifetime, error) = util::add_lifetime(&item.generics, "a");
-					let (_impl_generics, enum_type_generics, enum_where_clause) = item.generics.split_for_impl();
-					let (fields_impl_generics, fields_type_generics, _where_clause) = field_generics.split_for_impl();
-					let fields_where_clause = make_where_clause(context, &item);
-
-					quote! {
-						Self::#variant_name ( .. ) => {
-							#error
-							struct Fields #fields_type_generics #enum_where_clause (&#field_lifetime #enum_name #enum_type_generics);
-							impl #fields_impl_generics  #serde::ser::Serialize for Fields #fields_type_generics #fields_where_clause {
-								fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
-								where
-									S: #serde::Serializer,
-								{
-									match &self.0 {
-										#enum_name::#variant_name ( #(#mapped_field_name),* ) => {
-											let mut seq = #serde::ser::Serializer::serialize_seq(serializer, Some(#field_count))?;
-											#(
-												#serde::ser::SerializeSeq::serialize_element(&mut seq, #mapped_field_name)?;
-											)*
-											#serde::ser::SerializeSeq::end(seq)
-										},
-										// We already know `self` is the right variant, so we can not get here.
-										_ => ::core::unreachable!(),
-									}
-								}
-							}
-
-							let mut map = #serde::ser::Serializer::serialize_map(serializer, Some(2))?;
-							#serde::ser::SerializeMap::serialize_key(&mut map, "type")?;
-							#serde::ser::SerializeMap::serialize_value(&mut map, #snake_case)?;
-							#serde::ser::SerializeMap::serialize_key(&mut map, #snake_case)?;
-							#serde::ser::SerializeMap::serialize_value(&mut map, &Fields(self))?;
-							#serde::ser::SerializeMap::end(map)
-						}
-					}
-				},
-			},
-		}
-	});
+			}
+		})
+		.collect();
 
 	let (impl_generics, type_generics, _where_clause) = item.generics.split_for_impl();
 	let where_clause = make_where_clause(context, &item);
 
+	let serde = &context.serde;
 	quote! {
 		impl #impl_generics  #serde::Serialize for #enum_name #type_generics #where_clause {
 			fn serialize<S: #serde::ser::Serializer>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error> {
 				match self {
-					#(#match_arms)*,
+					#(#match_arms)*
 				}
 			}
 		}
@@ -150,6 +48,7 @@ fn make_where_clause(context: &Context, item: &crate::input::Enum) -> Option<syn
 	let mut predicates = Vec::<syn::WherePredicate>::new();
 	for variant in &item.variants {
 		for ty in variant.fields.iter_types() {
+			let ty = util::strip_type_wrappers(ty);
 			if util::type_uses_generic(ty, &item.generics) {
 				predicates.push(syn::parse_quote! {
 					#ty: #serde::Serialize
@@ -169,6 +68,93 @@ fn make_where_clause(context: &Context, item: &crate::input::Enum) -> Option<syn
 				None
 			} else {
 				Some(syn::parse_quote!(where #(#predicates,)*))
+			}
+		}
+	}
+}
+
+fn make_repr_struct(context: &mut Context, item: &crate::input::Enum, variant: &crate::input::Variant) -> TokenStream {
+	// Make a struct with borrowed fields.
+	let (generics, lifetime) = util::add_lifetime(context, &item.generics, "serde_double_tag");
+	let borrowed_fields = variant.fields.add_lifetime(&lifetime);
+
+	// Remove generic parameters not needed for the fields of this variant.
+	let generics = util::prune_generics(&generics, borrowed_fields.iter_types());
+	let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+	let tag_field_name = super::tag_field_name(context, item);
+	let data_field_name = super::variant_tag_value(item, variant);
+
+	// Prepare attributes for the `Repr` struct.
+	let repr_rename = item.attr.rename.clone()
+		.unwrap_or_else(|| crate::input::attributes::KeyValueArg::new_call_site("serde", syn::LitStr::new(&item.ident.to_string(), item.ident.span())));
+	let data_field_skip = match variant.fields {
+		crate::input::Fields::Unit => Some(quote!(#[serde(skip)])),
+		crate::input::Fields::Tuple(_) => None,
+		crate::input::Fields::Struct(_) => None,
+	};
+
+	// Prepare attributes for the `Tag` enum.
+	let tag_rename_all = &item.attr.rename_all;
+	let tag_rename = match &item.attr.rename {
+		None => format!("{}Tag", item.ident),
+		Some(x) => format!("{}Tag", x.value.value()),
+	};
+	let tag_rename = quote!(#[serde(rename = #tag_rename)]);
+	let variant_rename = &variant.attr.rename;
+
+	// Prepare attributes for the `Data` struct.
+	let data_rename_all = variant.rename_all_rule(item);
+	let data_rename = &variant.attr.rename;
+
+	let serde = &context.serde;
+	let serde_str = serde.to_token_stream().to_string();
+	let variant_name = &variant.ident;
+
+	quote! {
+		#[derive(#serde::Serialize)]
+		#[serde(crate = #serde_str)]
+		#repr_rename
+		struct Repr #impl_generics #where_clause {
+			#[serde(rename = #tag_field_name)]
+			tag: Tag,
+
+			#[serde(rename = #data_field_name)]
+			#data_field_skip
+			data: Data #type_generics,
+		}
+
+		#[derive(#serde::Serialize)]
+		#[serde(crate = #serde_str)]
+		#tag_rename_all
+		#tag_rename
+		enum Tag {
+			#variant_rename
+			#variant_name
+		}
+
+		#[derive(#serde::Serialize)]
+		#[serde(crate = #serde_str)]
+		#data_rename_all
+		#data_rename
+		struct Data #impl_generics #where_clause #borrowed_fields;
+	}
+}
+
+fn fields_expression(fields: &crate::input::Fields) -> TokenStream {
+	match fields {
+		crate::input::Fields::Unit => TokenStream::new(),
+		crate::input::Fields::Tuple(fields) => {
+			let mapped_field_name = fields.fields.iter().map(|x| quote::format_ident!("field_{}", x.index));
+			quote! {
+				(#(#mapped_field_name),*)
+			}
+		},
+		crate::input::Fields::Struct(fields) => {
+			let field_name = fields.fields.iter().map(|x| &x.ident);
+			let mapped_field_name = fields.fields.iter().map(|x| quote::format_ident!("field_{}", x.ident));
+			quote! {
+				{ #(#field_name: #mapped_field_name),* }
 			}
 		}
 	}

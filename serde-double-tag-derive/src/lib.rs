@@ -44,10 +44,6 @@ impl Context {
 		self.errors.push(syn::Error::new(span, format_args!("serde_double_tag: {message}")))
 	}
 
-	fn call_site_error(&mut self, message: impl std::fmt::Display) {
-		self.error(proc_macro2::Span::call_site(), message)
-	}
-
 	fn spanned_error<T: quote::ToTokens>(&mut self, object: &T, message: impl std::fmt::Display) {
 		self.errors.push(syn::Error::new_spanned(object, format_args!("serde_double_tag: {message}")))
 	}

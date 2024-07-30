@@ -1,26 +1,25 @@
-pub mod attributes;
-
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
 
 use crate::Context;
 
+pub mod attributes;
+
 pub struct Enum {
 	pub attr: attributes::EnumAttributes,
-	pub vis: syn::Visibility,
-	pub enum_token: syn::token::Enum,
 	pub ident: syn::Ident,
 	pub generics: syn::Generics,
 	pub variants: syn::punctuated::Punctuated<Variant, syn::token::Comma>,
 }
 
 impl Enum {
-	pub fn parse2(context: &mut Context, tokens: proc_macro2::TokenStream) -> Result<Self, ()> {
+	pub fn parse2(context: &mut Context, tokens: TokenStream) -> Result<Self, ()> {
 		let item: syn::Item = syn::parse2(tokens)
 			.map_err(|e| context.syn_error(e))?;
 		match item {
 			syn::Item::Enum(item) => Ok(Self::from_syn(context, item)),
 			_ => {
-				context.error(crate::util::item_token_span(&item), "this serde represebntation is only available for enums");
+				context.error(crate::util::item_token_span(&item), "this serde representation is only available for enums");
 				Err(())
 			}
 		}
@@ -29,8 +28,6 @@ impl Enum {
 	fn from_syn(context: &mut Context, input: syn::ItemEnum) -> Self {
 		Self {
 			attr: attributes::EnumAttributes::from_syn(context, input.attrs),
-			vis: input.vis,
-			enum_token: input.enum_token,
 			ident: input.ident,
 			generics: input.generics,
 			variants: Variant::from_punctuated(context, input.variants),
@@ -63,8 +60,20 @@ impl Variant {
 			})
 			.collect()
 	}
+
+	#[allow(clippy::manual_map)]
+	pub fn rename_all_rule(&self, item: &Enum) -> Option<attributes::KeyValueArg<attributes::keyword::rename_all, attributes::RenameRule>> {
+		if let Some(rename_all) = self.attr.rename_all.clone() {
+			Some(rename_all)
+		} else if let Some(rename_all_fields) = item.attr.rename_all_fields.clone() {
+			Some(rename_all_fields.map_key(|key| attributes::keyword::rename_all(key.span)))
+		} else {
+			None
+		}
+	}
 }
 
+#[derive(Clone)]
 pub enum Fields {
 	Unit,
 	Tuple(TupleFields),
@@ -80,6 +89,14 @@ impl Fields {
 		}
 	}
 
+	pub fn add_lifetime(&self, lifetime: &syn::Lifetime) -> Self {
+		match self {
+			Self::Unit => Self::Unit,
+			Self::Tuple(x) => Self::Tuple(x.add_lifetime(lifetime)),
+			Self::Struct(x) => Self::Struct(x.add_lifetime(lifetime)),
+		}
+	}
+
 	pub fn iter_types(&self) -> FieldTypes<'_> {
 		match self {
 			Self::Unit => FieldTypes::Unit,
@@ -87,24 +104,19 @@ impl Fields {
 			Self::Struct(x) => FieldTypes::Struct(x.fields.iter()),
 		}
 	}
+}
 
-	pub fn len(&self) -> usize {
+impl ToTokens for Fields {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
 		match self {
-			Self::Unit => 0,
-			Self::Tuple(x) => x.len(),
-			Self::Struct(x) => x.len(),
-		}
-	}
-
-	pub fn is_empty(&self) -> bool {
-		match self {
-			Self::Unit => true,
-			Self::Tuple(x) => x.is_empty(),
-			Self::Struct(x) => x.is_empty(),
+			Self::Unit => (),
+			Self::Tuple(x) => x.to_tokens(tokens),
+			Self::Struct(x) => x.to_tokens(tokens),
 		}
 	}
 }
 
+#[derive(Clone)]
 pub struct TupleFields {
 	pub paren: syn::token::Paren,
 	pub fields: syn::punctuated::Punctuated<TupleField, syn::token::Comma>,
@@ -127,15 +139,35 @@ impl TupleFields {
 		}
 	}
 
-	pub fn len(&self) -> usize {
-		self.fields.len()
-	}
-
-	pub fn is_empty(&self) -> bool {
-		self.fields.is_empty()
+	pub fn add_lifetime(&self, lifetime: &syn::Lifetime) -> Self {
+		let fields = self.fields
+			.pairs()
+			.map(|elem| {
+				let (field, punct) = elem.into_tuple();
+				let field = field.add_lifetime(lifetime.clone());
+				syn::punctuated::Pair::new(field, punct.cloned())
+			})
+			.collect();
+		Self {
+			paren: self.paren,
+			fields,
+		}
 	}
 }
 
+impl ToTokens for TupleFields {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
+		let Self {
+			paren,
+			fields,
+		} = self;
+		paren.surround(tokens, |tokens| {
+			fields.to_tokens(tokens);
+		})
+	}
+}
+
+#[derive(Clone)]
 pub struct TupleField {
 	pub index: usize,
 	pub attrs: Vec<syn::Attribute>,
@@ -152,8 +184,39 @@ impl TupleField {
 			ty: input.ty,
 		}
 	}
+
+	fn add_lifetime(&self, lifetime: syn::Lifetime) -> Self {
+		Self {
+			index: self.index,
+			attrs: self.attrs.clone(),
+			vis: self.vis.clone(),
+			ty: syn::Type::Reference(syn::TypeReference {
+				and_token: Default::default(),
+				lifetime: Some(lifetime.clone()),
+				mutability: None,
+				elem: Box::new(self.ty.clone()),
+			})
+		}
+	}
 }
 
+impl ToTokens for TupleField {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
+		let Self {
+			index: _,
+			attrs,
+			vis,
+			ty,
+		} = self;
+		for attr in attrs {
+			attr.to_tokens(tokens);
+		}
+		vis.to_tokens(tokens);
+		ty.to_tokens(tokens);
+	}
+}
+
+#[derive(Clone)]
 pub struct StructFields {
 	pub brace: syn::token::Brace,
 	pub fields: syn::punctuated::Punctuated<StructField, syn::token::Comma>,
@@ -175,29 +238,35 @@ impl  StructFields {
 		}
 	}
 
-	pub fn len(&self) -> usize {
-		self.fields.len()
-	}
-
-	pub fn is_empty(&self) -> bool {
-		self.fields.is_empty()
+	pub fn add_lifetime(&self, lifetime: &syn::Lifetime) -> Self {
+		let fields = self.fields
+			.pairs()
+			.map(|elem| {
+				let (field, punct) = elem.into_tuple();
+				let field = field.add_lifetime(lifetime.clone());
+				syn::punctuated::Pair::new(field, punct.cloned())
+			})
+			.collect();
+		Self {
+			brace: self.brace,
+			fields,
+		}
 	}
 }
 
-impl quote::ToTokens for StructFields {
-	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+impl ToTokens for StructFields {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
 		let Self {
 			brace,
 			fields,
 		} = self;
 		brace.surround(tokens, |tokens| {
-			for field in fields {
-				field.to_tokens(tokens);
-			}
+			fields.to_tokens(tokens)
 		})
 	}
 }
 
+#[derive(Clone)]
 pub struct StructField {
 	pub attrs: Vec<syn::Attribute>,
 	pub vis: syn::Visibility,
@@ -230,10 +299,25 @@ impl StructField {
 			ty: input.ty,
 		}
 	}
+
+	fn add_lifetime(&self, lifetime: syn::Lifetime) -> Self {
+		Self {
+			attrs: self.attrs.clone(),
+			vis: self.vis.clone(),
+			ident: self.ident.clone(),
+			colon: self.colon,
+			ty: syn::Type::Reference(syn::TypeReference {
+				and_token: Default::default(),
+				lifetime: Some(lifetime.clone()),
+				mutability: None,
+				elem: Box::new(self.ty.clone()),
+			})
+		}
+	}
 }
 
-impl quote::ToTokens for StructField {
-	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+impl ToTokens for StructField {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
 		let Self {
 			attrs,
 			vis,
@@ -248,21 +332,6 @@ impl quote::ToTokens for StructField {
 		ident.to_tokens(tokens);
 		colon.to_tokens(tokens);
 		ty.to_tokens(tokens);
-	}
-}
-
-pub struct Discriminant {
-	pub eq: syn::token::Eq,
-	pub expr: syn::Expr,
-}
-
-impl Discriminant {
-	fn from_syn(input: (syn::token::Eq, syn::Expr)) -> syn::Result<Self> {
-		let (eq, expr) = input;
-		Ok(Self {
-			eq,
-			expr,
-		})
 	}
 }
 

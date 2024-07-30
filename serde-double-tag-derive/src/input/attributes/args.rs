@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 
 use crate::Context;
 
@@ -105,12 +105,19 @@ impl<K, V> KeyValueArg<K, V> {
 		}
 	}
 
-	pub fn new_str(attr_path: &str, value: &str) -> Self
+	pub fn map_key<F, NewKey>(self, fun: F) -> KeyValueArg<NewKey, V>
 	where
-		K: Default,
-		V: syn::parse::Parse,
+		F: FnOnce(K) -> NewKey,
 	{
-		Self::new_call_site(attr_path, syn::parse_str(value).unwrap())
+		KeyValueArg {
+			pound: self.pound,
+			bracket: self.bracket,
+			attr_path: self.attr_path,
+			delimiter: self.delimiter,
+			key: fun(self.key),
+			eq: self.eq,
+			value: self.value,
+		}
 	}
 }
 
@@ -154,8 +161,8 @@ where
 
 		if self.is_none() {
 			*self = Some(KeywordArg {
-				pound: parser.pound.clone(),
-				bracket: parser.bracket.clone(),
+				pound: parser.pound,
+				bracket: parser.bracket,
 				attr_path: parser.path.clone(),
 				delimiter: parser.delimiter.clone(),
 				keyword,
@@ -192,8 +199,8 @@ where
 		}
 
 		*self = Some(KeyValueArg {
-			pound: parser.pound.clone(),
-			bracket: parser.bracket.clone(),
+			pound: parser.pound,
+			bracket: parser.bracket,
 			attr_path: parser.path.clone(),
 			delimiter: parser.delimiter.clone(),
 			key,
@@ -226,8 +233,8 @@ where
 		};
 
 		self.push(KeyValueArg {
-			pound: parser.pound.clone(),
-			bracket: parser.bracket.clone(),
+			pound: parser.pound,
+			bracket: parser.bracket,
 			attr_path: parser.path.clone(),
 			delimiter: parser.delimiter.clone(),
 			key,
@@ -262,6 +269,7 @@ where
 	Ok((Some(keyword), rest))
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_key_value_attr_arg<K, V>(input: &syn::parse::ParseBuffer) -> syn::Result<(Option<(K, syn::token::Eq, V)>, TokenStream)>
 where
 	K: syn::parse::Parse,

@@ -13,9 +13,10 @@ fn serialize_enum() {
 	#[derive(serde_double_tag::Serialize, serde_double_tag::Deserialize)]
 	#[serde(rename_all = "snake_case")]
 	#[serde(deny_unknown_fields)]
+	#[serde(tag = "type")]
 	enum MyEnum {
 		Unit,
-		UnitTuple(),
+		EmptyTuple(),
 		NewType(String),
 		Tuple(u8, String),
 		EmptyStruct {},
@@ -25,7 +26,7 @@ fn serialize_enum() {
 		}
 	}
 	assert!(json(MyEnum::Unit) == r#"{"type":"unit"}"#);
-	assert!(json(MyEnum::UnitTuple()) == r#"{"type":"unit_tuple"}"#);
+	assert!(json(MyEnum::EmptyTuple()) == r#"{"type":"empty_tuple","empty_tuple":[]}"#);
 	assert!(json(MyEnum::NewType("hello".into())) == r#"{"type":"new_type","new_type":"hello"}"#);
 	assert!(json(MyEnum::Tuple(3, "world".into())) == r#"{"type":"tuple","tuple":[3,"world"]}"#);
 	assert!(json(MyEnum::EmptyStruct {}) == r#"{"type":"empty_struct","empty_struct":{}}"#);
@@ -35,9 +36,11 @@ fn serialize_enum() {
 #[test]
 fn serialize_enum_generic() {
 	#[derive(serde_double_tag::Serialize, serde_double_tag::Deserialize)]
+	#[serde(rename_all = "snake_case")]
+	#[serde(tag = "type")]
 	enum MyEnum<T> {
 		Unit,
-		UnitTuple(),
+		EmptyTuple(),
 		NewType(T),
 		Tuple(u8, T),
 		EmptyStruct {},
@@ -47,7 +50,7 @@ fn serialize_enum_generic() {
 		}
 	}
 	assert!(json(MyEnum::Unit::<()>) == r#"{"type":"unit"}"#);
-	assert!(json(MyEnum::UnitTuple::<()>()) == r#"{"type":"unit_tuple"}"#);
+	assert!(json(MyEnum::EmptyTuple::<()>()) == r#"{"type":"empty_tuple","empty_tuple":[]}"#);
 	assert!(json(MyEnum::NewType("hello")) == r#"{"type":"new_type","new_type":"hello"}"#);
 	assert!(json(MyEnum::Tuple(3, "world")) == r#"{"type":"tuple","tuple":[3,"world"]}"#);
 	assert!(json(MyEnum::EmptyStruct::<()> {}) == r#"{"type":"empty_struct","empty_struct":{}}"#);
@@ -57,9 +60,11 @@ fn serialize_enum_generic() {
 #[test]
 fn serialize_enum_generic_lifetime() {
 	#[derive(serde_double_tag::Serialize)]
+	#[serde(rename_all = "snake_case")]
+	#[serde(tag = "type")]
 	enum MyEnum<'a, T> {
 		Unit,
-		UnitTuple(),
+		EmptyTuple(),
 		NewType(&'a T),
 		Tuple(u8, &'a T),
 		EmptyStruct {},
@@ -69,7 +74,7 @@ fn serialize_enum_generic_lifetime() {
 		},
 	}
 	assert!(json(MyEnum::Unit::<()>) == r#"{"type":"unit"}"#);
-	assert!(json(MyEnum::UnitTuple::<()>()) == r#"{"type":"unit_tuple"}"#);
+	assert!(json(MyEnum::EmptyTuple::<()>()) == r#"{"type":"empty_tuple","empty_tuple":[]}"#);
 	assert!(json(MyEnum::NewType(&"hello")) == r#"{"type":"new_type","new_type":"hello"}"#);
 	assert!(json(MyEnum::Tuple(3, &"world")) == r#"{"type":"tuple","tuple":[3,"world"]}"#);
 	assert!(json(MyEnum::EmptyStruct::<()> {}) == r#"{"type":"empty_struct","empty_struct":{}}"#);

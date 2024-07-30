@@ -1,5 +1,6 @@
 /// The different possible ways to change case of fields in a struct, or variants in an enum.
 #[derive(Copy, Clone, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum RenameRule {
 	/// Rename direct children to "lowercase" style.
 	LowerCase,
@@ -96,6 +97,7 @@ impl RenameRule {
 	}
 
 	/// Apply a renaming rule to a struct field, returning the version expected in the source.
+	#[allow(unused)]
 	pub fn apply_to_field(self, field: &str) -> String {
 		match self {
 			Self::LowerCase | Self::SnakeCase => field.to_owned(),
