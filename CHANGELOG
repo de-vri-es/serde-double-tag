@@ -1,4 +1,4 @@
-# Unreleased
+# Version 0.0.1 - 2024-07-31
 - [add][minor] Add derive macro for `serde::Deserialize`.
 - [add][minor] Add Derive macro for `serde::Serialize`.
 - [add][minor] Add Derive macro for `schemars::JsonSchema`.
