@@ -1,5 +1,3 @@
-#![cfg(feature = "derive")]
-
 use assert2::{assert, let_assert};
 
 #[track_caller]

@@ -59,7 +59,9 @@ pub fn impl_json_schema(context: &mut Context, item: crate::input::Enum) -> Toke
 							#schemars::schema::ObjectValidation {
 								properties,
 								required,
-								additionalProperties: #additional_properties,
+								additional_properties: ::core::option::Option::Some(::std::boxed::Box::new(
+									#schemars::schema::Schema::Bool(#additional_properties)
+								)),
 								.. ::core::default::Default::default()
 							}
 						)),
