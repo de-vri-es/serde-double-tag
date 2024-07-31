@@ -1,7 +1,7 @@
 [package]
 name = "serde-double-tag-derive"
 description = "proc macros for the `serde-double-tag` crate"
-version = "0.0.1"
+version = "0.0.2"
 license = "BSD-2-Clause"
 repository = "https://github.com/de-vri-es/serde-double-tag"
 documentation = "https://docs.rs/serde-double-tag-derive"
