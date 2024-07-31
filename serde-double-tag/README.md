@@ -55,6 +55,5 @@ Currently supported `serde` attributes:
 * `#[serde(rename_all_fields = "...")]
 * `#[serde(deny_unknown_fields = "...")]
 
-## `schemars`
-
 [`serde`]: https://docs.rs/serde/
+[`schemars::JsonSchema`]: https://docs.rs/schemars/latest/schemars/trait.JsonSchema.html

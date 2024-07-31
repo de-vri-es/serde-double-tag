@@ -52,8 +52,6 @@
 //! * `#[serde(rename_all = "...")]
 //! * `#[serde(rename_all_fields = "...")]
 //! * `#[serde(deny_unknown_fields = "...")]
-//!
-//! # `schemars`
 
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
