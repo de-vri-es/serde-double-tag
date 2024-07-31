@@ -1,7 +1,7 @@
 [package]
 name = "serde-double-tag"
 description = "double tagged enum representation for `serde`"
-version = "0.0.2"
+version = "0.0.3"
 license = "BSD-2-Clause"
 repository = "https://github.com/de-vri-es/serde-double-tag"
 documentation = "https://docs.rs/serde-double-tag"
@@ -18,7 +18,7 @@ schemars = ["dep:schemars", "dep:serde_json", "serde-double-tag-derive/schemars"
 [dependencies]
 schemars = { version = "0.8.21", optional = true, features = ["preserve_order"] }
 serde = { version = "1.0.203", features = ["derive"] }
-serde-double-tag-derive = { version = "=0.0.2", path = "../serde-double-tag-derive" }
+serde-double-tag-derive = { version = "=0.0.3", path = "../serde-double-tag-derive" }
 serde_json = { version = "1.0.118", optional = true, features = ["preserve_order"] }
 
 [dev-dependencies]

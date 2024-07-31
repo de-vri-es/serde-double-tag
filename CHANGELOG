@@ -1,4 +1,4 @@
-# Unreleased
+# Version 0.0.3 - 2024-07-31
 - [fix][minor] Fix the `JsonSchema` derive macro.
 
 # Version 0.0.2 - 2024-07-31
