@@ -16,6 +16,7 @@ pub fn impl_json_schema(context: &mut Context, item: crate::input::Enum) -> Toke
 	let variant_count = item.variants.len();
 	let tag_schema = make_tag_schema(context, &tag_values);
 	let subschemas = make_variant_subschemas(context, &item, &tag_field_name, &tag_values);
+	let additional_properties = item.attr.deny_unknown_fields.is_none();
 
 	let internal = &context.internal;
 	let schemars = &context.schemars;
@@ -58,6 +59,7 @@ pub fn impl_json_schema(context: &mut Context, item: crate::input::Enum) -> Toke
 							#schemars::schema::ObjectValidation {
 								properties,
 								required,
+								additionalProperties: #additional_properties,
 								.. ::core::default::Default::default()
 							}
 						)),
@@ -211,7 +213,7 @@ fn make_schema_for_struct_fields(
 				..::core::default::Default::default()
 			}
 		)
-    }}
+	}}
 }
 
 /// Generate code that returns a `schemars::schema::Schema` for tuple fields.
