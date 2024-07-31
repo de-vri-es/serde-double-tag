@@ -15,7 +15,7 @@ pub fn impl_deserialize_enum(context: &mut Context, item: crate::input::Enum) ->
 			let variant_name =  &variant.ident;
 			let variant_tag_value = super::variant_tag_value(&item, variant);
 			let data = make_data_struct(context, &item, variant);
-			let fields = fields_expression(&variant.fields);
+			let fields = super::fields_expression(&variant.fields);
 			let deny_unknown_fields = item.attr.deny_unknown_fields.is_some();
 
 			let function = match variant.fields {
@@ -40,8 +40,8 @@ pub fn impl_deserialize_enum(context: &mut Context, item: crate::input::Enum) ->
 
 	let (_impl_generics, type_generics, _where_clause) = item.generics.split_for_impl();
 	let (de_generics, de_lifetime) = util::add_lifetime(context, &item.generics, "de");
-	let where_clause = make_where_clause(context, &item, &de_lifetime);
 	let (impl_generics, _type_generics, _where_clause) = de_generics.split_for_impl();
+	let where_clause = make_where_clause(context, &item, &de_lifetime);
 
 	let tag_enum = make_tag_enum(context, &item);
 
@@ -49,6 +49,7 @@ pub fn impl_deserialize_enum(context: &mut Context, item: crate::input::Enum) ->
 	let serde = &context.serde;
 
 	quote! {
+		#[automatically_derived]
 		impl #impl_generics  #serde::Deserialize<#de_lifetime> for #enum_name #type_generics #where_clause {
 			fn deserialize<D: #serde::Deserializer<#de_lifetime>>(deserializer: D) -> ::core::result::Result<Self, D::Error> {
 				struct Visitor #type_generics {
@@ -157,7 +158,7 @@ fn make_data_struct(context: &mut Context, item: &crate::input::Enum, variant: &
 	};
 
 	// If this is a unit variant, add a `Default` implementation for the data struct.
-	if matches!(&variant.fields, crate::input::Fields::Unit) {
+	if fields.is_unit() {
 		tokens.extend(quote! {
 			impl ::core::default::Default for Data {
 				fn default() -> Self {
@@ -168,23 +169,4 @@ fn make_data_struct(context: &mut Context, item: &crate::input::Enum, variant: &
 	}
 
 	tokens
-}
-
-fn fields_expression(fields: &crate::input::Fields) -> TokenStream {
-	match fields {
-		crate::input::Fields::Unit => TokenStream::new(),
-		crate::input::Fields::Tuple(fields) => {
-			let mapped_field_name = fields.fields.iter().map(|x| quote::format_ident!("field_{}", x.index));
-			quote! {
-				(#(#mapped_field_name),*)
-			}
-		},
-		crate::input::Fields::Struct(fields) => {
-			let field_name = fields.fields.iter().map(|x| &x.ident);
-			let mapped_field_name = fields.fields.iter().map(|x| quote::format_ident!("field_{}", x.ident));
-			quote! {
-				{ #(#field_name: #mapped_field_name),* }
-			}
-		}
-	}
 }

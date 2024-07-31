@@ -187,7 +187,7 @@ dependencies = [
 
 [[package]]
 name = "serde-double-tag"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "assert2",
  "schemars",
@@ -199,10 +199,11 @@ dependencies = [
 
 [[package]]
 name = "serde-double-tag-derive"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "proc-macro2",
  "quote",
+ "serde-double-tag-derive",
  "syn 2.0.68",
 ]
 

@@ -11,7 +11,7 @@ pub fn impl_serialize_enum(context: &mut Context, item: crate::input::Enum) -> T
 		.map(|variant| {
 			let repr = make_repr_struct(context, &item, variant);
 			let variant_name = &variant.ident;
-			let fields = fields_expression(&variant.fields);
+			let fields = super::fields_expression(&variant.fields);
 			let serde = &context.serde;
 
 			quote! {
@@ -32,6 +32,7 @@ pub fn impl_serialize_enum(context: &mut Context, item: crate::input::Enum) -> T
 
 	let serde = &context.serde;
 	quote! {
+		#[automatically_derived]
 		impl #impl_generics  #serde::Serialize for #enum_name #type_generics #where_clause {
 			fn serialize<S: #serde::ser::Serializer>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error> {
 				match self {
@@ -88,10 +89,9 @@ fn make_repr_struct(context: &mut Context, item: &crate::input::Enum, variant: &
 	// Prepare attributes for the `Repr` struct.
 	let repr_rename = item.attr.rename.clone()
 		.unwrap_or_else(|| crate::input::attributes::KeyValueArg::new_call_site("serde", syn::LitStr::new(&item.ident.to_string(), item.ident.span())));
-	let data_field_skip = match variant.fields {
-		crate::input::Fields::Unit => Some(quote!(#[serde(skip)])),
-		crate::input::Fields::Tuple(_) => None,
-		crate::input::Fields::Struct(_) => None,
+	let data_field_skip = match variant.fields.is_unit() {
+		true => Some(quote!(#[serde(skip)])),
+		false => None,
 	};
 
 	// Prepare attributes for the `Tag` enum.
@@ -138,24 +138,5 @@ fn make_repr_struct(context: &mut Context, item: &crate::input::Enum, variant: &
 		#data_rename_all
 		#data_rename
 		struct Data #impl_generics #where_clause #borrowed_fields;
-	}
-}
-
-fn fields_expression(fields: &crate::input::Fields) -> TokenStream {
-	match fields {
-		crate::input::Fields::Unit => TokenStream::new(),
-		crate::input::Fields::Tuple(fields) => {
-			let mapped_field_name = fields.fields.iter().map(|x| quote::format_ident!("field_{}", x.index));
-			quote! {
-				(#(#mapped_field_name),*)
-			}
-		},
-		crate::input::Fields::Struct(fields) => {
-			let field_name = fields.fields.iter().map(|x| &x.ident);
-			let mapped_field_name = fields.fields.iter().map(|x| quote::format_ident!("field_{}", x.ident));
-			quote! {
-				{ #(#field_name: #mapped_field_name),* }
-			}
-		}
 	}
 }

@@ -10,7 +10,7 @@ fn json<T: serde::Serialize>(value: T) -> String {
 
 #[test]
 fn serialize_enum() {
-	#[derive(serde_double_tag::Serialize, serde_double_tag::Deserialize)]
+	#[derive(serde_double_tag::Serialize, serde_double_tag::Deserialize, serde_double_tag::JsonSchema)]
 	#[serde(rename_all = "snake_case")]
 	#[serde(deny_unknown_fields)]
 	#[serde(tag = "type")]
@@ -35,7 +35,7 @@ fn serialize_enum() {
 
 #[test]
 fn serialize_enum_generic() {
-	#[derive(serde_double_tag::Serialize, serde_double_tag::Deserialize)]
+	#[derive(serde_double_tag::Serialize, serde_double_tag::Deserialize, serde_double_tag::JsonSchema)]
 	#[serde(rename_all = "snake_case")]
 	#[serde(tag = "type")]
 	enum MyEnum<T> {
@@ -59,7 +59,7 @@ fn serialize_enum_generic() {
 
 #[test]
 fn serialize_enum_generic_lifetime() {
-	#[derive(serde_double_tag::Serialize)]
+	#[derive(serde_double_tag::Serialize, serde_double_tag::JsonSchema)]
 	#[serde(rename_all = "snake_case")]
 	#[serde(tag = "type")]
 	enum MyEnum<'a, T> {

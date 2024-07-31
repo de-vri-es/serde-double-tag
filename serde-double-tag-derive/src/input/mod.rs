@@ -81,6 +81,12 @@ pub enum Fields {
 }
 
 impl Fields {
+	pub fn is_unit(&self) -> bool {
+		matches!(self, Self::Unit)
+	}
+}
+
+impl Fields {
 	fn from_syn(context: &mut Context, input: syn::Fields) -> Self {
 		match input {
 			syn::Fields::Unit => Self::Unit,
@@ -170,16 +176,16 @@ impl ToTokens for TupleFields {
 #[derive(Clone)]
 pub struct TupleField {
 	pub index: usize,
-	pub attrs: Vec<syn::Attribute>,
+	pub attrs: attributes::FieldAttributes,
 	pub vis: syn::Visibility,
 	pub ty: syn::Type,
 }
 
 impl TupleField {
-	fn from_syn(_context: &mut Context, index: usize, input: syn::Field) -> Self {
+	fn from_syn(context: &mut Context, index: usize, input: syn::Field) -> Self {
 		Self {
 			index,
-			attrs: input.attrs,
+			attrs: attributes::FieldAttributes::from_syn(context, input.attrs),
 			vis: input.vis,
 			ty: input.ty,
 		}
@@ -208,9 +214,7 @@ impl ToTokens for TupleField {
 			vis,
 			ty,
 		} = self;
-		for attr in attrs {
-			attr.to_tokens(tokens);
-		}
+		attrs.to_tokens(tokens);
 		vis.to_tokens(tokens);
 		ty.to_tokens(tokens);
 	}
@@ -268,7 +272,7 @@ impl ToTokens for StructFields {
 
 #[derive(Clone)]
 pub struct StructField {
-	pub attrs: Vec<syn::Attribute>,
+	pub attrs: attributes::FieldAttributes,
 	pub vis: syn::Visibility,
 	pub ident: syn::Ident,
 	pub colon: syn::token::Colon,
@@ -291,8 +295,12 @@ impl StructField {
 				syn::token::Colon(Span::call_site())
 			},
 		};
+		let attrs = attributes::FieldAttributes::from_syn(context, input.attrs);
+		if let Some(rename) = &attrs.rename {
+			context.error(rename.key.span, "#[serde(rename)] is not supported for tuple fields");
+		}
 		Self {
-			attrs: input.attrs,
+			attrs,
 			vis: input.vis,
 			ident,
 			colon,
@@ -325,9 +333,7 @@ impl ToTokens for StructField {
 			colon,
 			ty,
 		} = self;
-		for attr in attrs {
-			attr.to_tokens(tokens);
-		}
+		attrs.to_tokens(tokens);
 		vis.to_tokens(tokens);
 		ident.to_tokens(tokens);
 		colon.to_tokens(tokens);

@@ -17,24 +17,22 @@ fn crate_name() -> syn::Path {
 struct Context {
 	internal: syn::Path,
 	serde: syn::Path,
+	#[cfg(feature = "schemars")]
+	schemars: syn::Path,
 	errors: Vec<syn::Error>,
 }
 
 impl Context {
 	fn new(crate_name: syn::Path) -> Self {
-		let mut internal = crate_name;
-		internal.segments.push(syn::PathSegment {
-			ident: syn::Ident::new("internal__", proc_macro2::Span::call_site()),
-			arguments: syn::PathArguments::None,
-		});
-		let mut serde = internal.clone();
-		serde.segments.push(syn::PathSegment {
-			ident: syn::Ident::new("serde", proc_macro2::Span::call_site()),
-			arguments: syn::PathArguments::None,
-		});
+		let internal = extend_path(&crate_name, "internal__");
+		let serde = extend_path(&internal, "serde");
+		#[cfg(feature = "schemars")]
+		let schemars = extend_path(&internal, "schemars");
 		Self {
 			internal,
 			serde,
+			#[cfg(feature = "schemars")]
+			schemars,
 			errors: Vec::new(),
 		}
 	}
@@ -82,5 +80,19 @@ pub fn derive_serialize(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
 
 #[proc_macro_derive(JsonSchema, attributes(serde))]
 pub fn derive_json_schema(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	todo!();
+	let mut context = Context::new(crate_name());
+	let output = match input::Enum::parse2(&mut context, tokens.into()) {
+		Ok(input) => generate::impl_json_schema(&mut context, input),
+		Err(()) => proc_macro2::TokenStream::new(),
+	};
+	context.collect_errors(output).into()
+}
+
+fn extend_path(path: &syn::Path, segment: &str) -> syn::Path {
+	let mut output = path.clone();
+	output.segments.push(syn::PathSegment {
+		ident: syn::Ident::new(segment, proc_macro2::Span::call_site()),
+		arguments: Default::default(),
+	});
+	output
 }

@@ -1,13 +1,20 @@
 [package]
 name = "serde-double-tag-derive"
 description = "proc macros for the `serde-double-tag` crate"
-version = "0.1.0"
+version = "0.0.1"
+
 edition = "2021"
 
 [lib]
 proc-macro = true
 
+[features]
+schemars = []
+
 [dependencies]
 proc-macro2 = "1.0.86"
 quote = "1.0.36"
 syn = { version = "2.0.68", features = ["full", "visit"] }
+
+[dev-dependencies]
+serde-double-tag-derive = { path = ".", features = ["schemars"] }

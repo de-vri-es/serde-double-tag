@@ -12,8 +12,6 @@ pub struct EnumAttributes {
 	pub rename_all_fields: Option<KeyValueArg<keyword::rename_all_fields, RenameRule>>,
 	pub deny_unknown_fields: Option<KeywordArg<keyword::deny_unknown_fields>>,
 	pub tag: Option<KeyValueArg<keyword::tag, syn::LitStr>>,
-	pub bound: Option<KeyValueArg<keyword::bound, syn::WhereClause>>,
-	pub expecting: Option<KeyValueArg<keyword::expecting, syn::LitStr>>,
 }
 
 impl EnumAttributes {
@@ -33,8 +31,6 @@ impl EnumAttributes {
 				&mut self.rename_all_fields,
 				&mut self.deny_unknown_fields,
 				&mut self.tag,
-				&mut self.bound,
-				&mut self.expecting,
 			]);
 		}
 	}
@@ -48,16 +44,12 @@ impl quote::ToTokens for EnumAttributes {
 			rename_all_fields,
 			deny_unknown_fields,
 			tag,
-			bound,
-			expecting,
 		} = self;
 		rename.to_tokens(tokens);
 		rename_all.to_tokens(tokens);
 		rename_all_fields.to_tokens(tokens);
 		deny_unknown_fields.to_tokens(tokens);
 		tag.to_tokens(tokens);
-		bound.to_tokens(tokens);
-		expecting.to_tokens(tokens);
 	}
 }
 
@@ -65,8 +57,6 @@ impl quote::ToTokens for EnumAttributes {
 pub struct VariantAttributes {
 	pub rename: Option<KeyValueArg<keyword::rename, syn::LitStr>>,
 	pub rename_all: Option<KeyValueArg<keyword::rename_all, RenameRule>>,
-	pub alias: Vec<KeyValueArg<keyword::alias, syn::LitStr>>,
-	pub bound: Option<KeyValueArg<keyword::bound, syn::WhereClause>>,
 }
 
 impl VariantAttributes {
@@ -83,8 +73,6 @@ impl VariantAttributes {
 			parser.parse(context, [
 				&mut self.rename,
 				&mut self.rename_all,
-				&mut self.bound,
-				&mut self.alias,
 			]);
 		}
 	}
@@ -95,15 +83,41 @@ impl quote::ToTokens for VariantAttributes {
 		let Self {
 			rename,
 			rename_all,
-			bound,
-			alias,
 		} = self;
 		rename.to_tokens(tokens);
 		rename_all.to_tokens(tokens);
-		bound.to_tokens(tokens);
-		for alias in alias {
-			alias.to_tokens(tokens);
+	}
+}
+
+#[derive(Clone, Default)]
+pub struct FieldAttributes {
+	pub rename: Option<KeyValueArg<keyword::rename, syn::LitStr>>,
+}
+
+impl FieldAttributes {
+	pub fn from_syn(context: &mut Context, input: Vec<syn::Attribute>) -> Self {
+		let mut output = Self::default();
+		for attr in input {
+			output.parse_one(context, attr)
 		}
+		output
+	}
+
+	fn parse_one(&mut self, context: &mut Context, attr: syn::Attribute) {
+		if let Some(mut parser) = args::AttrParser::new(context, attr, "serde") {
+			parser.parse(context, [
+				&mut self.rename,
+			]);
+		}
+	}
+}
+
+impl quote::ToTokens for FieldAttributes {
+	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		let Self {
+			rename,
+		} = self;
+		rename.to_tokens(tokens);
 	}
 }
 
@@ -113,9 +127,6 @@ pub mod keyword {
 	syn::custom_keyword!(rename_all_fields);
 	syn::custom_keyword!(deny_unknown_fields);
 	syn::custom_keyword!(tag);
-	syn::custom_keyword!(bound);
-	syn::custom_keyword!(expecting);
-	syn::custom_keyword!(alias);
 }
 
 #[derive(Clone, Copy)]

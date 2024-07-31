@@ -1,19 +1,20 @@
 [package]
 name = "serde-double-tag"
-version = "0.1.0"
+description = "double tagged enum representation for `serde`"
+version = "0.0.1"
+
 edition = "2021"
 
 [features]
-derive = ["dep:serde-double-tag-derive"]
-schemars = ["dep:schemars"]
+schemars = ["dep:schemars", "dep:serde_json", "serde-double-tag-derive/schemars"]
 
 [dependencies]
-schemars = { version = "0.8.21", features = ["preserve_order"], optional = true }
+schemars = { version = "0.8.21", optional = true, features = ["preserve_order"] }
 serde = { version = "1.0.203", features = ["derive"] }
-serde-double-tag-derive = { version = "=0.1.0", optional = true, path = "../serde-double-tag-derive" }
-serde_json = { version = "1.0.118", features = ["preserve_order"] }
+serde-double-tag-derive = { version = "=0.0.1", path = "../serde-double-tag-derive" }
+serde_json = { version = "1.0.118", optional = true, features = ["preserve_order"] }
 
 [dev-dependencies]
-serde-double-tag = { path = ".", features = ["derive"] }
-
 assert2 = "0.3.14"
+serde-double-tag = { path = ".", features = ["schemars"] }
+serde_json = { version = "1.0.118", features = ["preserve_order"] }
