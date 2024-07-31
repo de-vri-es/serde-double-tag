@@ -20,7 +20,7 @@ impl AttrParser {
 			_ => {
 				context.spanned_error(attribute.path(), format_args!("expected #[{ident}(...)]"));
 				return None;
-			}
+			},
 		};
 		Some(Self {
 			pound: attribute.pound_token,
@@ -48,11 +48,11 @@ impl AttrParser {
 		match syn::parse::Parser::parse2(parse_unregcognized_argument, arguments) {
 			Err(e) => {
 				context.syn_error(e);
-			}
+			},
 			Ok((ident, rest)) => {
 				self.arguments = rest;
 				context.error(ident.span(), "unrecognized attribute argument: {ident}");
-			}
+			},
 		}
 	}
 }
@@ -156,7 +156,7 @@ where
 			Err(e) => {
 				context.syn_error(e);
 				return false;
-			}
+			},
 		};
 
 		if self.is_none() {
@@ -190,11 +190,14 @@ where
 			Err(e) => {
 				context.syn_error(e);
 				return false;
-			}
+			},
 		};
 
 		if self.is_some() {
-			context.spanned_error(&key, format_args!("attribute `{}` already set before", key.to_token_stream()));
+			context.spanned_error(
+				&key,
+				format_args!("attribute `{}` already set before", key.to_token_stream()),
+			);
 			return true;
 		}
 
@@ -229,7 +232,7 @@ where
 			Err(e) => {
 				context.syn_error(e);
 				return false;
-			}
+			},
 		};
 
 		self.push(KeyValueArg {
@@ -270,7 +273,9 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-fn parse_key_value_attr_arg<K, V>(input: &syn::parse::ParseBuffer) -> syn::Result<(Option<(K, syn::token::Eq, V)>, TokenStream)>
+fn parse_key_value_attr_arg<K, V>(
+	input: &syn::parse::ParseBuffer,
+) -> syn::Result<(Option<(K, syn::token::Eq, V)>, TokenStream)>
 where
 	K: syn::parse::Parse,
 	V: syn::parse::Parse,
@@ -302,18 +307,20 @@ fn parse_unregcognized_argument(input: &syn::parse::ParseBuffer) -> syn::Result<
 	let ident: syn::Ident = input.parse()?;
 
 	// Eat all token trees up to the next comma, and the comma itself.
-	input.step(|cursor| {
-		let mut cursor = *cursor;
-		while let Some((next, rest)) = cursor.token_tree() {
-			cursor = rest;
-			if let proc_macro2::TokenTree::Punct(punct) = next {
-				if punct.as_char() == ',' {
-					return Ok(((), cursor));
+	input
+		.step(|cursor| {
+			let mut cursor = *cursor;
+			while let Some((next, rest)) = cursor.token_tree() {
+				cursor = rest;
+				if let proc_macro2::TokenTree::Punct(punct) = next {
+					if punct.as_char() == ',' {
+						return Ok(((), cursor));
+					}
 				}
 			}
-		}
-		Ok(((), cursor))
-	}).unwrap();
+			Ok(((), cursor))
+		})
+		.unwrap();
 
 	// Collect the remainder into a TokenStream again.
 	let rest = input.parse()?;

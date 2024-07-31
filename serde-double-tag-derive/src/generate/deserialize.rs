@@ -8,20 +8,27 @@ pub fn impl_deserialize_enum(context: &mut Context, item: crate::input::Enum) ->
 	let enum_name = &item.ident;
 	let tag_field_name = super::tag_field_name(context, &item);
 
-	let variant_name: Vec<_> = item.variants.iter()
-		.map(|variant| &variant.ident).collect();
-	let variant_deserialize: Vec<_> = item.variants.iter()
+	let variant_name: Vec<_> = item.variants.iter().map(|variant| &variant.ident).collect();
+	let variant_deserialize: Vec<_> = item
+		.variants
+		.iter()
 		.map(|variant| {
-			let variant_name =  &variant.ident;
+			let variant_name = &variant.ident;
 			let variant_tag_value = super::variant_tag_value(&item, variant);
 			let data = make_data_struct(context, &item, variant);
 			let fields = super::fields_expression(&variant.fields);
 			let deny_unknown_fields = item.attr.deny_unknown_fields.is_some();
 
 			let function = match variant.fields {
-				crate::input::Fields::Unit => proc_macro2::Ident::new("deserialize_variant_optional", Span::call_site()),
-				crate::input::Fields::Tuple(_) => proc_macro2::Ident::new("deserialize_variant_required", Span::call_site()),
-				crate::input::Fields::Struct(_) => proc_macro2::Ident::new("deserialize_variant_required", Span::call_site()),
+				crate::input::Fields::Unit => {
+					proc_macro2::Ident::new("deserialize_variant_optional", Span::call_site())
+				},
+				crate::input::Fields::Tuple(_) => {
+					proc_macro2::Ident::new("deserialize_variant_required", Span::call_site())
+				},
+				crate::input::Fields::Struct(_) => {
+					proc_macro2::Ident::new("deserialize_variant_required", Span::call_site())
+				},
 			};
 
 			let internal = &context.internal;
@@ -84,7 +91,11 @@ pub fn impl_deserialize_enum(context: &mut Context, item: crate::input::Enum) ->
 	}
 }
 
-fn make_where_clause(context: &Context, item: &crate::input::Enum, de_lifetime: &syn::Lifetime) -> Option<syn::WhereClause> {
+fn make_where_clause(
+	context: &Context,
+	item: &crate::input::Enum,
+	de_lifetime: &syn::Lifetime,
+) -> Option<syn::WhereClause> {
 	let serde = &context.serde;
 
 	let mut predicates = Vec::<syn::WherePredicate>::new();
@@ -111,7 +122,7 @@ fn make_where_clause(context: &Context, item: &crate::input::Enum, de_lifetime: 
 			} else {
 				Some(syn::parse_quote!(where #(#predicates,)*))
 			}
-		}
+		},
 	}
 }
 

@@ -70,20 +70,14 @@ impl VariantAttributes {
 
 	fn parse_one(&mut self, context: &mut Context, attr: syn::Attribute) {
 		if let Some(mut parser) = args::AttrParser::new(context, attr, "serde") {
-			parser.parse(context, [
-				&mut self.rename,
-				&mut self.rename_all,
-			]);
+			parser.parse(context, [&mut self.rename, &mut self.rename_all]);
 		}
 	}
 }
 
 impl quote::ToTokens for VariantAttributes {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-		let Self {
-			rename,
-			rename_all,
-		} = self;
+		let Self { rename, rename_all } = self;
 		rename.to_tokens(tokens);
 		rename_all.to_tokens(tokens);
 	}
@@ -105,18 +99,14 @@ impl FieldAttributes {
 
 	fn parse_one(&mut self, context: &mut Context, attr: syn::Attribute) {
 		if let Some(mut parser) = args::AttrParser::new(context, attr, "serde") {
-			parser.parse(context, [
-				&mut self.rename,
-			]);
+			parser.parse(context, [&mut self.rename]);
 		}
 	}
 }
 
 impl quote::ToTokens for FieldAttributes {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-		let Self {
-			rename,
-		} = self;
+		let Self { rename } = self;
 		rename.to_tokens(tokens);
 	}
 }

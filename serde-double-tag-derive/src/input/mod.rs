@@ -14,14 +14,16 @@ pub struct Enum {
 
 impl Enum {
 	pub fn parse2(context: &mut Context, tokens: TokenStream) -> Result<Self, ()> {
-		let item: syn::Item = syn::parse2(tokens)
-			.map_err(|e| context.syn_error(e))?;
+		let item: syn::Item = syn::parse2(tokens).map_err(|e| context.syn_error(e))?;
 		match item {
 			syn::Item::Enum(item) => Ok(Self::from_syn(context, item)),
 			_ => {
-				context.error(crate::util::item_token_span(&item), "this serde representation is only available for enums");
+				context.error(
+					crate::util::item_token_span(&item),
+					"this serde representation is only available for enums",
+				);
 				Err(())
-			}
+			},
 		}
 	}
 
@@ -50,7 +52,10 @@ impl Variant {
 		}
 	}
 
-	fn from_punctuated(context: &mut Context, input: syn::punctuated::Punctuated<syn::Variant, syn::token::Comma>) -> syn::punctuated::Punctuated<Self, syn::token::Comma> {
+	fn from_punctuated(
+		context: &mut Context,
+		input: syn::punctuated::Punctuated<syn::Variant, syn::token::Comma>,
+	) -> syn::punctuated::Punctuated<Self, syn::token::Comma> {
 		input
 			.into_pairs()
 			.map(|elem| {
@@ -62,7 +67,10 @@ impl Variant {
 	}
 
 	#[allow(clippy::manual_map)]
-	pub fn rename_all_rule(&self, item: &Enum) -> Option<attributes::KeyValueArg<attributes::keyword::rename_all, attributes::RenameRule>> {
+	pub fn rename_all_rule(
+		&self,
+		item: &Enum,
+	) -> Option<attributes::KeyValueArg<attributes::keyword::rename_all, attributes::RenameRule>> {
 		if let Some(rename_all) = self.attr.rename_all.clone() {
 			Some(rename_all)
 		} else if let Some(rename_all_fields) = item.attr.rename_all_fields.clone() {
@@ -130,7 +138,8 @@ pub struct TupleFields {
 
 impl TupleFields {
 	fn from_syn(context: &mut Context, input: syn::FieldsUnnamed) -> Self {
-		let fields = input.unnamed
+		let fields = input
+			.unnamed
 			.into_pairs()
 			.enumerate()
 			.map(|(index, elem)| {
@@ -146,7 +155,8 @@ impl TupleFields {
 	}
 
 	pub fn add_lifetime(&self, lifetime: &syn::Lifetime) -> Self {
-		let fields = self.fields
+		let fields = self
+			.fields
 			.pairs()
 			.map(|elem| {
 				let (field, punct) = elem.into_tuple();
@@ -163,10 +173,7 @@ impl TupleFields {
 
 impl ToTokens for TupleFields {
 	fn to_tokens(&self, tokens: &mut TokenStream) {
-		let Self {
-			paren,
-			fields,
-		} = self;
+		let Self { paren, fields } = self;
 		paren.surround(tokens, |tokens| {
 			fields.to_tokens(tokens);
 		})
@@ -201,7 +208,7 @@ impl TupleField {
 				lifetime: Some(lifetime.clone()),
 				mutability: None,
 				elem: Box::new(self.ty.clone()),
-			})
+			}),
 		}
 	}
 }
@@ -226,9 +233,10 @@ pub struct StructFields {
 	pub fields: syn::punctuated::Punctuated<StructField, syn::token::Comma>,
 }
 
-impl  StructFields {
+impl StructFields {
 	fn from_syn(context: &mut Context, input: syn::FieldsNamed) -> Self {
-		let fields = input.named
+		let fields = input
+			.named
 			.into_pairs()
 			.map(|elem| {
 				let (field, punct) = elem.into_tuple();
@@ -243,7 +251,8 @@ impl  StructFields {
 	}
 
 	pub fn add_lifetime(&self, lifetime: &syn::Lifetime) -> Self {
-		let fields = self.fields
+		let fields = self
+			.fields
 			.pairs()
 			.map(|elem| {
 				let (field, punct) = elem.into_tuple();
@@ -260,13 +269,8 @@ impl  StructFields {
 
 impl ToTokens for StructFields {
 	fn to_tokens(&self, tokens: &mut TokenStream) {
-		let Self {
-			brace,
-			fields,
-		} = self;
-		brace.surround(tokens, |tokens| {
-			fields.to_tokens(tokens)
-		})
+		let Self { brace, fields } = self;
+		brace.surround(tokens, |tokens| fields.to_tokens(tokens))
 	}
 }
 
@@ -291,7 +295,10 @@ impl StructField {
 		let colon = match input.colon_token {
 			Some(x) => x,
 			None => {
-				context.spanned_error(&input.ty, "struct field must have a colon (`:`) to separate the identifier and the type");
+				context.spanned_error(
+					&input.ty,
+					"struct field must have a colon (`:`) to separate the identifier and the type",
+				);
 				syn::token::Colon(Span::call_site())
 			},
 		};
@@ -319,7 +326,7 @@ impl StructField {
 				lifetime: Some(lifetime.clone()),
 				mutability: None,
 				elem: Box::new(self.ty.clone()),
-			})
+			}),
 		}
 	}
 }

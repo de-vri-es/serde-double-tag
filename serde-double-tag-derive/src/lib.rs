@@ -2,9 +2,9 @@
 //!
 //! See the documentation of that crate for more information.
 
-mod util;
-mod input;
 mod generate;
+mod input;
+mod util;
 
 fn crate_name() -> syn::Path {
 	let mut segments = syn::punctuated::Punctuated::new();
@@ -41,13 +41,15 @@ impl Context {
 		}
 	}
 
-
 	fn error(&mut self, span: proc_macro2::Span, message: impl std::fmt::Display) {
 		self.errors.push(syn::Error::new(span, format_args!("serde_double_tag: {message}")))
 	}
 
 	fn spanned_error<T: quote::ToTokens>(&mut self, object: &T, message: impl std::fmt::Display) {
-		self.errors.push(syn::Error::new_spanned(object, format_args!("serde_double_tag: {message}")))
+		self.errors.push(syn::Error::new_spanned(
+			object,
+			format_args!("serde_double_tag: {message}"),
+		))
 	}
 
 	fn syn_error(&mut self, error: syn::Error) {

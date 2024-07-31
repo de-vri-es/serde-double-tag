@@ -101,7 +101,11 @@ fn make_tag_schema(context: &Context, tag_values: &[String]) -> TokenStream {
 }
 
 /// Generate code that returns a `schemars::schema::Schema` for the given [`Fields`].
-fn make_schema_for_fields(context: &mut Context, item: &crate::input::Enum, variant: &crate::input::Variant) -> TokenStream {
+fn make_schema_for_fields(
+	context: &mut Context,
+	item: &crate::input::Enum,
+	variant: &crate::input::Variant,
+) -> TokenStream {
 	match &variant.fields {
 		crate::input::Fields::Unit => make_schema_for_unit_value(context),
 		crate::input::Fields::Tuple(fields) => make_schema_for_tuple_fields(context, fields),
@@ -147,7 +151,7 @@ fn make_variant_subschemas(
 		1 => {
 			let subschema = subschemas.remove(0);
 			quote!( ::core::option::Option::Some(::std::boxed::Box::new(#subschema)) )
-		}
+		},
 		count => quote! {
 			::core::option::Option::Some(::std::boxed::Box::new(
 				#schemars::schema::SubschemaValidation {
@@ -172,7 +176,6 @@ fn make_schema_for_struct_fields(
 	variant: &crate::input::Variant,
 	fields: &crate::input::StructFields,
 ) -> TokenStream {
-
 	let field_name: Vec<_> = fields
 		.fields
 		.iter()
@@ -217,26 +220,24 @@ fn make_schema_for_struct_fields(
 }
 
 /// Generate code that returns a `schemars::schema::Schema` for tuple fields.
-fn make_schema_for_tuple_fields(
-	context: &mut Context,
-	fields: &crate::input::TupleFields,
-) -> TokenStream {
+fn make_schema_for_tuple_fields(context: &mut Context, fields: &crate::input::TupleFields) -> TokenStream {
 	match &fields.fields.len() {
 		// Treat single-field tuple variants as the inner type.
 		1 => {
 			let field_type = &fields.fields[0].ty;
 			quote! { generator.subschema_for::<#field_type>() }
-		}
+		},
 
 		// Treat the rest as fixed-size arrays.
 		field_count => {
 			let field_type = fields.fields.iter().map(|x| &x.ty);
 			let item_count = u32::try_from(*field_count)
-				.map_err(|_| context.spanned_error(fields, format_args!(
-					"too many fields in variant: {} > {}",
-					fields.fields.len(),
-					u32::MAX
-				)))
+				.map_err(|_| {
+					context.spanned_error(
+						fields,
+						format_args!("too many fields in variant: {} > {}", fields.fields.len(), u32::MAX),
+					)
+				})
 				.unwrap_or(u32::MAX);
 
 			let schemars = &context.schemars;
@@ -266,7 +267,7 @@ fn make_schema_for_tuple_fields(
 					}
 				)
 			}}
-		}
+		},
 	}
 }
 
@@ -297,6 +298,6 @@ fn make_where_clause(context: &Context, item: &crate::input::Enum) -> Option<syn
 			} else {
 				Some(syn::parse_quote!(where #(#predicates,)*))
 			}
-		}
+		},
 	}
 }

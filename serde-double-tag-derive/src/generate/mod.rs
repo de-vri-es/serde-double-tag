@@ -80,6 +80,6 @@ fn fields_expression(fields: &crate::input::Fields) -> TokenStream {
 			quote! {
 				{ #(#field_name: #mapped_field_name),* }
 			}
-		}
+		},
 	}
 }

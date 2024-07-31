@@ -37,7 +37,7 @@ pub fn add_lifetime(context: &mut Context, generics: &syn::Generics, hint: &str)
 		Err(e) => {
 			context.syn_error(e);
 			return (generics.clone(), syn::Lifetime::new(hint, Span::call_site()));
-		}
+		},
 	};
 	let lifetime = syn::Lifetime::new(&format!("'{lifetime}"), Span::call_site());
 	let param = syn::LifetimeParam::new(lifetime.clone());
@@ -125,8 +125,8 @@ pub fn type_uses_generic(ty: &syn::Type, generics: &syn::Generics) -> bool {
 				}
 			}
 			syn::visit::visit_lifetime(self, item)
-
 		}
+
 		fn visit_const_param(&mut self, item: &syn::ConstParam) {
 			for param in &self.generics.params {
 				if let syn::GenericParam::Const(param) = param {
@@ -140,10 +140,7 @@ pub fn type_uses_generic(ty: &syn::Type, generics: &syn::Generics) -> bool {
 		}
 	}
 
-	let mut visitor = Visit {
-		generics,
-		found: false,
-	};
+	let mut visitor = Visit { generics, found: false };
 
 	syn::visit::Visit::visit_type(&mut visitor, ty);
 	visitor.found

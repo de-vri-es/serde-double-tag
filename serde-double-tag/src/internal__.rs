@@ -29,14 +29,17 @@ pub fn json_value(input: impl Into<serde_json::Value>) -> serde_json::Value {
 pub fn object_schema(properties: schemars::Map<String, schemars::schema::Schema>) -> schemars::schema::Schema {
 	let required = properties.keys().cloned().collect();
 	schemars::schema::SchemaObject {
-		instance_type: Some(schemars::schema::SingleOrVec::Single(Box::new(schemars::schema::InstanceType::Object))),
+		instance_type: Some(schemars::schema::SingleOrVec::Single(Box::new(
+			schemars::schema::InstanceType::Object,
+		))),
 		object: Some(Box::new(schemars::schema::ObjectValidation {
 			properties,
 			required,
 			..Default::default()
 		})),
 		..Default::default()
-	}.into()
+	}
+	.into()
 }
 
 /// Create a schema for a constant string value.
@@ -44,10 +47,13 @@ pub fn object_schema(properties: schemars::Map<String, schemars::schema::Schema>
 #[cfg(feature = "schemars")]
 pub fn const_string_value(value: &str) -> schemars::schema::Schema {
 	schemars::schema::SchemaObject {
-		instance_type: Some(schemars::schema::SingleOrVec::Single(Box::new(schemars::schema::InstanceType::String))),
+		instance_type: Some(schemars::schema::SingleOrVec::Single(Box::new(
+			schemars::schema::InstanceType::String,
+		))),
 		const_value: Some(value.into()),
 		..Default::default()
-	}.into()
+	}
+	.into()
 }
 
 /// Create a subschema for a variant.
@@ -78,7 +84,8 @@ pub fn subschema_to_schema(subschema: schemars::schema::SubschemaValidation) -> 
 	schemars::schema::SchemaObject {
 		subschemas: Some(Box::new(subschema)),
 		..Default::default()
-	}.into()
+	}
+	.into()
 }
 
 /// Create a schema for a unit value.
@@ -86,9 +93,12 @@ pub fn subschema_to_schema(subschema: schemars::schema::SubschemaValidation) -> 
 #[cfg(feature = "schemars")]
 pub fn unit_schema() -> schemars::schema::Schema {
 	schemars::schema::SchemaObject {
-		instance_type: Some(schemars::schema::SingleOrVec::Single(Box::new(schemars::schema::InstanceType::Null))),
+		instance_type: Some(schemars::schema::SingleOrVec::Single(Box::new(
+			schemars::schema::InstanceType::Null,
+		))),
 		..Default::default()
-	}.into()
+	}
+	.into()
 }
 
 /// Names of the tag and content fields for an enum variant.
@@ -103,9 +113,7 @@ pub struct FieldNames {
 
 impl FieldNames {
 	fn as_slice(&'static self) -> &'static [&'static str] {
-		unsafe {
-			core::slice::from_raw_parts(&self.tag, 2)
-		}
+		unsafe { core::slice::from_raw_parts(&self.tag, 2) }
 	}
 }
 
@@ -136,26 +144,32 @@ where
 					if value == self.field_name {
 						Ok(())
 					} else {
-						Err(E::custom(format_args!("expected a field with name {:?}, but got {value:?}", self.field_name)))
+						Err(E::custom(format_args!(
+							"expected a field with name {:?}, but got {value:?}",
+							self.field_name
+						)))
 					}
 				}
 			}
 
-			deserializer.deserialize_identifier(Visitor {
-				field_name: self.0,
-			})
+			deserializer.deserialize_identifier(Visitor { field_name: self.0 })
 		}
 	}
 
 	let key_seed = TagKeySeed(tag_field_name);
 	let value_seed = core::marker::PhantomData::<Tag>;
-	let ((), tag) = map.next_entry_seed(key_seed, value_seed)?
+	let ((), tag) = map
+		.next_entry_seed(key_seed, value_seed)?
 		.ok_or_else(|| serde::de::Error::missing_field(tag_field_name))?;
 	Ok(tag)
 }
 
 /// Deserialize the variant fields from a `MapAccess`.
-pub fn deserialize_variant_required<'de, T, M>(fields: &'static FieldNames, mut map: M, deny_unknown_fields: bool) -> Result<T, M::Error>
+pub fn deserialize_variant_required<'de, T, M>(
+	fields: &'static FieldNames,
+	mut map: M,
+	deny_unknown_fields: bool,
+) -> Result<T, M::Error>
 where
 	T: serde::de::Deserialize<'de>,
 	M: serde::de::MapAccess<'de>,
@@ -169,7 +183,7 @@ where
 			Some(true) => break Some(map.next_value()?),
 			Some(false) => {
 				let _: IgnoredAny = map.next_value()?;
-			}
+			},
 		}
 	};
 	if let Some(variant) = variant {
@@ -189,7 +203,11 @@ where
 }
 
 /// Deserialize the fields of a variant, substituting the default value if the field is not present.
-pub fn deserialize_variant_optional<'de, T, M>(fields: &'static FieldNames, mut map: M, deny_unknown_fields: bool) -> Result<T, M::Error>
+pub fn deserialize_variant_optional<'de, T, M>(
+	fields: &'static FieldNames,
+	mut map: M,
+	deny_unknown_fields: bool,
+) -> Result<T, M::Error>
 where
 	T: serde::de::Deserialize<'de> + Default,
 	M: serde::de::MapAccess<'de>,
@@ -203,7 +221,7 @@ where
 			Some(true) => break Some(map.next_value()?),
 			Some(false) => {
 				let _: serde::de::IgnoredAny = map.next_value()?;
-			}
+			},
 		}
 	};
 	if let Some(variant) = variant {
@@ -246,9 +264,7 @@ impl<'de> serde::de::DeserializeSeed<'de> for VariantKeySeed {
 			}
 		}
 
-		deserializer.deserialize_identifier(Visitor {
-			field_name: self.0,
-		})
+		deserializer.deserialize_identifier(Visitor { field_name: self.0 })
 	}
 }
 

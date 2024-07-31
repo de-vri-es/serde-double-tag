@@ -7,7 +7,9 @@ use crate::{util, Context};
 pub fn impl_serialize_enum(context: &mut Context, item: crate::input::Enum) -> TokenStream {
 	let enum_name = &item.ident;
 
-	let match_arms: Vec<_> = item.variants.iter()
+	let match_arms: Vec<_> = item
+		.variants
+		.iter()
 		.map(|variant| {
 			let repr = make_repr_struct(context, &item, variant);
 			let variant_name = &variant.ident;
@@ -70,7 +72,7 @@ fn make_where_clause(context: &Context, item: &crate::input::Enum) -> Option<syn
 			} else {
 				Some(syn::parse_quote!(where #(#predicates,)*))
 			}
-		}
+		},
 	}
 }
 
@@ -87,8 +89,12 @@ fn make_repr_struct(context: &mut Context, item: &crate::input::Enum, variant: &
 	let data_field_name = super::variant_tag_value(item, variant);
 
 	// Prepare attributes for the `Repr` struct.
-	let repr_rename = item.attr.rename.clone()
-		.unwrap_or_else(|| crate::input::attributes::KeyValueArg::new_call_site("serde", syn::LitStr::new(&item.ident.to_string(), item.ident.span())));
+	let repr_rename = item.attr.rename.clone().unwrap_or_else(|| {
+		crate::input::attributes::KeyValueArg::new_call_site(
+			"serde",
+			syn::LitStr::new(&item.ident.to_string(), item.ident.span()),
+		)
+	});
 	let data_field_skip = match variant.fields.is_unit() {
 		true => Some(quote!(#[serde(skip)])),
 		false => None,

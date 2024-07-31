@@ -12,7 +12,10 @@ pub fn prune_generics<'a>(generics: &syn::Generics, types: impl Iterator<Item = 
 
 	// Remove unused parameters and where clauses that reference removed parameters.
 	let params = used_idents.prune_generic_params(&generics.params);
-	let where_clause = generics.where_clause.as_ref().map(|x| used_idents.prune_where_clause(x));
+	let where_clause = generics
+		.where_clause
+		.as_ref()
+		.map(|x| used_idents.prune_where_clause(x));
 	syn::Generics {
 		lt_token: generics.lt_token,
 		params,
@@ -77,9 +80,7 @@ impl<'a> UsedGenerics<'a> {
 			}
 		}
 
-		let mut visit = Visit {
-			used: self,
-		};
+		let mut visit = Visit { used: self };
 
 		syn::visit::Visit::visit_type(&mut visit, ty);
 	}
@@ -87,7 +88,10 @@ impl<'a> UsedGenerics<'a> {
 	/// Create a filtered parameter list where all parameters are removed that are not in [`self.used_idents`] or [`self.used_lifetimes`].
 	///
 	/// Adds all removed parameters to [`self.removed_idents`] or [`self.removed_lifetimes`].
-	fn prune_generic_params(&mut self, params: &'a syn::punctuated::Punctuated<syn::GenericParam, syn::token::Comma>) -> syn::punctuated::Punctuated<syn::GenericParam, syn::token::Comma> {
+	fn prune_generic_params(
+		&mut self,
+		params: &'a syn::punctuated::Punctuated<syn::GenericParam, syn::token::Comma>,
+	) -> syn::punctuated::Punctuated<syn::GenericParam, syn::token::Comma> {
 		params
 			.pairs()
 			.filter_map(|elem| {
@@ -98,19 +102,22 @@ impl<'a> UsedGenerics<'a> {
 				let (value, punct) = elem.into_tuple();
 				Some(syn::punctuated::Pair::new(value.clone(), punct.cloned()))
 			})
-		.collect()
+			.collect()
 	}
 
 	/// Create a filtered where clause where all predicates are removed that used a parameter from [`self.removed_idents`] or [`self.removed_lifetimes`].
 	fn prune_where_clause(&self, where_clause: &syn::WhereClause) -> syn::WhereClause {
 		syn::WhereClause {
 			where_token: where_clause.where_token,
-			predicates: self.prune_where_predicates(&where_clause.predicates)
+			predicates: self.prune_where_predicates(&where_clause.predicates),
 		}
 	}
 
 	/// Create a filtered predicate list where all predicates are removed that used a parameter from [`self.removed_idents`] or [`self.removed_lifetimes`].
-	fn prune_where_predicates(&self, predicates: &syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>) -> syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma> {
+	fn prune_where_predicates(
+		&self,
+		predicates: &syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>,
+	) -> syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma> {
 		predicates
 			.pairs()
 			.filter_map(|elem| {
@@ -120,7 +127,7 @@ impl<'a> UsedGenerics<'a> {
 				let (value, punct) = elem.into_tuple();
 				Some(syn::punctuated::Pair::new(value.clone(), punct.cloned()))
 			})
-		.collect()
+			.collect()
 	}
 
 	/// Check if a generic parameter is in [`self.used_idents`] or [`self.used_lifetimes`].

@@ -20,17 +20,19 @@ fn serialize_enum() {
 		NewType(String),
 		Tuple(u8, String),
 		EmptyStruct {},
-		Struct {
-			field_a: String,
-			field_b: u8,
-		}
+		Struct { field_a: String, field_b: u8 },
 	}
 	assert!(json(MyEnum::Unit) == r#"{"type":"unit"}"#);
 	assert!(json(MyEnum::EmptyTuple()) == r#"{"type":"empty_tuple","empty_tuple":[]}"#);
 	assert!(json(MyEnum::NewType("hello".into())) == r#"{"type":"new_type","new_type":"hello"}"#);
 	assert!(json(MyEnum::Tuple(3, "world".into())) == r#"{"type":"tuple","tuple":[3,"world"]}"#);
 	assert!(json(MyEnum::EmptyStruct {}) == r#"{"type":"empty_struct","empty_struct":{}}"#);
-	assert!(json(MyEnum::Struct { field_a: "bye".into(), field_b: 7 }) == r#"{"type":"struct","struct":{"field_a":"bye","field_b":7}}"#);
+	assert!(
+		json(MyEnum::Struct {
+			field_a: "bye".into(),
+			field_b: 7
+		}) == r#"{"type":"struct","struct":{"field_a":"bye","field_b":7}}"#
+	);
 }
 
 #[test]
@@ -44,17 +46,19 @@ fn serialize_enum_generic() {
 		NewType(T),
 		Tuple(u8, T),
 		EmptyStruct {},
-		Struct {
-			field_a: T,
-			field_b: u8,
-		}
+		Struct { field_a: T, field_b: u8 },
 	}
 	assert!(json(MyEnum::Unit::<()>) == r#"{"type":"unit"}"#);
 	assert!(json(MyEnum::EmptyTuple::<()>()) == r#"{"type":"empty_tuple","empty_tuple":[]}"#);
 	assert!(json(MyEnum::NewType("hello")) == r#"{"type":"new_type","new_type":"hello"}"#);
 	assert!(json(MyEnum::Tuple(3, "world")) == r#"{"type":"tuple","tuple":[3,"world"]}"#);
 	assert!(json(MyEnum::EmptyStruct::<()> {}) == r#"{"type":"empty_struct","empty_struct":{}}"#);
-	assert!(json(MyEnum::Struct { field_a: "bye", field_b: 7 }) == r#"{"type":"struct","struct":{"field_a":"bye","field_b":7}}"#);
+	assert!(
+		json(MyEnum::Struct {
+			field_a: "bye",
+			field_b: 7
+		}) == r#"{"type":"struct","struct":{"field_a":"bye","field_b":7}}"#
+	);
 }
 
 #[test]
@@ -68,15 +72,17 @@ fn serialize_enum_generic_lifetime() {
 		NewType(&'a T),
 		Tuple(u8, &'a T),
 		EmptyStruct {},
-		Struct {
-			field_a: &'a T,
-			field_b: u8,
-		},
+		Struct { field_a: &'a T, field_b: u8 },
 	}
 	assert!(json(MyEnum::Unit::<()>) == r#"{"type":"unit"}"#);
 	assert!(json(MyEnum::EmptyTuple::<()>()) == r#"{"type":"empty_tuple","empty_tuple":[]}"#);
 	assert!(json(MyEnum::NewType(&"hello")) == r#"{"type":"new_type","new_type":"hello"}"#);
 	assert!(json(MyEnum::Tuple(3, &"world")) == r#"{"type":"tuple","tuple":[3,"world"]}"#);
 	assert!(json(MyEnum::EmptyStruct::<()> {}) == r#"{"type":"empty_struct","empty_struct":{}}"#);
-	assert!(json(MyEnum::Struct { field_a: &"bye", field_b: 7 }) == r#"{"type":"struct","struct":{"field_a":"bye","field_b":7}}"#);
+	assert!(
+		json(MyEnum::Struct {
+			field_a: &"bye",
+			field_b: 7
+		}) == r#"{"type":"struct","struct":{"field_a":"bye","field_b":7}}"#
+	);
 }

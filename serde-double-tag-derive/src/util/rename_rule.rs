@@ -87,12 +87,10 @@ impl RenameRule {
 					snake.push(ch.to_ascii_lowercase());
 				}
 				snake
-			}
+			},
 			Self::ScreamingSnakeCase => Self::SnakeCase.apply_to_variant(variant).to_ascii_uppercase(),
 			Self::KebabCase => Self::SnakeCase.apply_to_variant(variant).replace('_', "-"),
-			Self::ScreamingKebabCase => Self::ScreamingSnakeCase
-				.apply_to_variant(variant)
-				.replace('_', "-"),
+			Self::ScreamingKebabCase => Self::ScreamingSnakeCase.apply_to_variant(variant).replace('_', "-"),
 		}
 	}
 
@@ -115,11 +113,11 @@ impl RenameRule {
 					}
 				}
 				pascal
-			}
+			},
 			Self::CamelCase => {
 				let pascal = Self::PascalCase.apply_to_field(field);
 				pascal[..1].to_ascii_lowercase() + &pascal[1..]
-			}
+			},
 			Self::ScreamingSnakeCase => field.to_ascii_uppercase(),
 			Self::KebabCase => field.replace('_', "-"),
 			Self::ScreamingKebabCase => Self::ScreamingSnakeCase.apply_to_field(field).replace('_', "-"),
@@ -172,7 +170,10 @@ fn rename_variants() {
 		assert_eq!(RenameRule::SnakeCase.apply_to_variant(original), snake);
 		assert_eq!(RenameRule::ScreamingSnakeCase.apply_to_variant(original), screaming);
 		assert_eq!(RenameRule::KebabCase.apply_to_variant(original), kebab);
-		assert_eq!(RenameRule::ScreamingKebabCase.apply_to_variant(original), screaming_kebab);
+		assert_eq!(
+			RenameRule::ScreamingKebabCase.apply_to_variant(original),
+			screaming_kebab
+		);
 	}
 }
 
