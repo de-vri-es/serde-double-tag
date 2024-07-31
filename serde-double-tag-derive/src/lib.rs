@@ -1,3 +1,7 @@
+//! This crate contains proc-macros for the [`serde-double-tag`] crate.
+//!
+//! See the documentation of that crate for more information.
+
 mod util;
 mod input;
 mod generate;

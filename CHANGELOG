@@ -1,0 +1,8 @@
+# Unreleased
+- [add][minor] Add derive macro for `serde::Deserialize`.
+- [add][minor] Add Derive macro for `serde::Serialize`.
+- [add][minor] Add Derive macro for `schemars::JsonSchema`.
+- [add][minor] Add support for the `#[serde(rename)]` attribute.
+- [add][minor] Add support for the `#[serde(rename_all)]` attribute.
+- [add][minor] Add support for the `#[serde(rename_all_fields)]` attribute.
+- [add][minor] Add support for the `#[serde(deny_unknown_fields)]` attribute.

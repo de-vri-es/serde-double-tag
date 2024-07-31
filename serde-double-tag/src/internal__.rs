@@ -1,18 +1,29 @@
+//! Internal utilities for use by the derive macros.
+//!
+//! Do not call these directly, as they may be changed without matching semver bump.
+
+#![deny(missing_docs)]
+
 pub use ::serde;
 
 #[cfg(feature = "schemars")]
 pub use ::schemars;
 
+/// Convert a value into a [`String`].
 pub fn string(input: impl Into<String>) -> String {
 	input.into()
 }
 
+/// Convert a value into a [`serde_json::Value`].
 #[inline]
 #[cfg(feature = "schemars")]
 pub fn json_value(input: impl Into<serde_json::Value>) -> serde_json::Value {
 	input.into()
 }
 
+/// Create a schema for an object with the given properties.
+///
+/// All properties will be required.
 #[inline]
 #[cfg(feature = "schemars")]
 pub fn object_schema(properties: schemars::Map<String, schemars::schema::Schema>) -> schemars::schema::Schema {
@@ -28,6 +39,7 @@ pub fn object_schema(properties: schemars::Map<String, schemars::schema::Schema>
 	}.into()
 }
 
+/// Create a schema for a constant string value.
 #[inline]
 #[cfg(feature = "schemars")]
 pub fn const_string_value(value: &str) -> schemars::schema::Schema {
@@ -38,6 +50,7 @@ pub fn const_string_value(value: &str) -> schemars::schema::Schema {
 	}.into()
 }
 
+/// Create a subschema for a variant.
 #[inline]
 #[cfg(feature = "schemars")]
 pub fn variant_subschema(
@@ -58,6 +71,7 @@ pub fn variant_subschema(
 	}
 }
 
+/// Create a schema with the given subschema.
 #[inline]
 #[cfg(feature = "schemars")]
 pub fn subschema_to_schema(subschema: schemars::schema::SubschemaValidation) -> schemars::schema::Schema {
@@ -67,6 +81,7 @@ pub fn subschema_to_schema(subschema: schemars::schema::SubschemaValidation) -> 
 	}.into()
 }
 
+/// Create a schema for a unit value.
 #[inline]
 #[cfg(feature = "schemars")]
 pub fn unit_schema() -> schemars::schema::Schema {
@@ -76,9 +91,13 @@ pub fn unit_schema() -> schemars::schema::Schema {
 	}.into()
 }
 
+/// Names of the tag and content fields for an enum variant.
 #[repr(C)]
 pub struct FieldNames {
+	/// The name of the tag field.
 	pub tag: &'static str,
+
+	/// The name of the content field for this variant.
 	pub content: &'static str,
 }
 
@@ -90,6 +109,7 @@ impl FieldNames {
 	}
 }
 
+/// Deserialize the tag field from a `MapAccess`.
 pub fn deserialize_tag<'de, Tag, M>(tag_field_name: &'static str, map: &mut M) -> Result<Tag, M::Error>
 where
 	Tag: serde::de::Deserialize<'de>,
@@ -134,6 +154,7 @@ where
 	Ok(tag)
 }
 
+/// Deserialize the variant fields from a `MapAccess`.
 pub fn deserialize_variant_required<'de, T, M>(fields: &'static FieldNames, mut map: M, deny_unknown_fields: bool) -> Result<T, M::Error>
 where
 	T: serde::de::Deserialize<'de>,
@@ -167,6 +188,7 @@ where
 	}
 }
 
+/// Deserialize the fields of a variant, substituting the default value if the field is not present.
 pub fn deserialize_variant_optional<'de, T, M>(fields: &'static FieldNames, mut map: M, deny_unknown_fields: bool) -> Result<T, M::Error>
 where
 	T: serde::de::Deserialize<'de> + Default,
@@ -200,6 +222,7 @@ where
 	}
 }
 
+/// A deserialize seed for the variant data field key.
 #[derive(Copy, Clone)]
 struct VariantKeySeed(&'static str);
 
@@ -229,7 +252,9 @@ impl<'de> serde::de::DeserializeSeed<'de> for VariantKeySeed {
 	}
 }
 
-
+/// A deserialize seed for disallowed unknown fields.
+///
+/// Will always produce an error when deserializing a value.
 #[derive(Copy, Clone)]
 struct UnknownFieldKeySeed {
 	known_fields: &'static [&'static str],
