@@ -1,4 +1,4 @@
-# Unreleased
+# Version 0.0.4 - 2024-08-01
 - [fix][minor] Fix behavior of the `schemars::JsonSchema` derive macro with `deny_unknown_fields`.
 
 # Version 0.0.3 - 2024-07-31
