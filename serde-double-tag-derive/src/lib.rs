@@ -85,6 +85,7 @@ pub fn derive_serialize(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
 }
 
 #[proc_macro_derive(JsonSchema, attributes(serde))]
+#[cfg(feature = "schemars")]
 pub fn derive_json_schema(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let mut context = Context::new(crate_name());
 	let output = match input::Enum::parse2(&mut context, tokens.into()) {

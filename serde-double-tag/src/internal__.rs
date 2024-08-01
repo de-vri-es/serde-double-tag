@@ -26,8 +26,15 @@ pub fn json_value(input: impl Into<serde_json::Value>) -> serde_json::Value {
 /// All properties will be required.
 #[inline]
 #[cfg(feature = "schemars")]
-pub fn object_schema(properties: schemars::Map<String, schemars::schema::Schema>) -> schemars::schema::Schema {
+pub fn object_schema(properties: schemars::Map<String, schemars::schema::Schema>, deny_unknown_fields: bool) -> schemars::schema::Schema {
 	let required = properties.keys().cloned().collect();
+
+	let additional_properties = if deny_unknown_fields {
+		Some(Box::new(schemars::schema::Schema::Bool(false)))
+	} else {
+		None
+	};
+
 	schemars::schema::SchemaObject {
 		instance_type: Some(schemars::schema::SingleOrVec::Single(Box::new(
 			schemars::schema::InstanceType::Object,
@@ -35,6 +42,7 @@ pub fn object_schema(properties: schemars::Map<String, schemars::schema::Schema>
 		object: Some(Box::new(schemars::schema::ObjectValidation {
 			properties,
 			required,
+			additional_properties,
 			..Default::default()
 		})),
 		..Default::default()
@@ -63,16 +71,18 @@ pub fn variant_subschema(
 	tag_field_name: &'static str,
 	variant_name: &str,
 	variant_subschema: schemars::schema::Schema,
+	deny_unknown_fields: bool,
 ) -> schemars::schema::SubschemaValidation {
 	let mut if_properties = schemars::Map::with_capacity(1);
 	if_properties.insert(tag_field_name.into(), const_string_value(variant_name));
 
-	let mut then_properties = schemars::Map::with_capacity(1);
+	let mut then_properties = schemars::Map::with_capacity(2);
+	then_properties.insert(tag_field_name.to_string(), const_string_value(variant_name));
 	then_properties.insert(variant_name.to_string(), variant_subschema);
 
 	::schemars::schema::SubschemaValidation {
-		if_schema: Some(Box::new(object_schema(if_properties))),
-		then_schema: Some(Box::new(object_schema(then_properties))),
+		if_schema: Some(Box::new(object_schema(if_properties, false))),
+		then_schema: Some(Box::new(object_schema(then_properties, deny_unknown_fields))),
 		..Default::default()
 	}
 }

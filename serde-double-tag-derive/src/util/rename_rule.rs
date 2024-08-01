@@ -6,16 +6,14 @@ pub enum RenameRule {
 	LowerCase,
 	/// Rename direct children to "UPPERCASE" style.
 	UpperCase,
-	/// Rename direct children to "PascalCase" style, as typically used for
-	/// enum variants.
+	/// Rename direct children to "PascalCase" style, as typically used for enum variants.
 	PascalCase,
 	/// Rename direct children to "camelCase" style.
 	CamelCase,
 	/// Rename direct children to "snake_case" style, as commonly used for
 	/// fields.
 	SnakeCase,
-	/// Rename direct children to "SCREAMING_SNAKE_CASE" style, as commonly
-	/// used for constants.
+	/// Rename direct children to "SCREAMING_SNAKE_CASE" style, as commonly used for constants.
 	ScreamingSnakeCase,
 	/// Rename direct children to "kebab-case" style.
 	KebabCase,
@@ -95,6 +93,7 @@ impl RenameRule {
 	}
 
 	/// Apply a renaming rule to a struct field, returning the version expected in the source.
+	#[cfg_attr(not(feature = "schemars"), allow(unused))]
 	pub fn apply_to_field(self, field: &str) -> String {
 		match self {
 			Self::LowerCase | Self::SnakeCase => field.to_owned(),

@@ -16,7 +16,6 @@ pub fn impl_json_schema(context: &mut Context, item: crate::input::Enum) -> Toke
 	let variant_count = item.variants.len();
 	let tag_schema = make_tag_schema(context, &tag_values);
 	let subschemas = make_variant_subschemas(context, &item, &tag_field_name, &tag_values);
-	let additional_properties = item.attr.deny_unknown_fields.is_none();
 
 	let internal = &context.internal;
 	let schemars = &context.schemars;
@@ -59,9 +58,6 @@ pub fn impl_json_schema(context: &mut Context, item: crate::input::Enum) -> Toke
 							#schemars::schema::ObjectValidation {
 								properties,
 								required,
-								additional_properties: ::core::option::Option::Some(::std::boxed::Box::new(
-									#schemars::schema::Schema::Bool(#additional_properties)
-								)),
 								.. ::core::default::Default::default()
 							}
 						)),
@@ -131,6 +127,8 @@ fn make_variant_subschemas(
 	tag_field_name: &str,
 	tag_values: &[String],
 ) -> TokenStream {
+	let deny_unknown_fields = item.attr.deny_unknown_fields.is_some();
+
 	// Generate the code for the subschema validation for each variant.
 	let mut subschemas = Vec::with_capacity(item.variants.len());
 	for (variant, tag_value) in item.variants.iter().zip(tag_values) {
@@ -139,7 +137,7 @@ fn make_variant_subschemas(
 		}
 		let fields_schema = make_schema_for_fields(context, item, variant);
 		let internal = &context.internal;
-		subschemas.push(quote!(#internal::variant_subschema(#tag_field_name, #tag_value, #fields_schema)));
+		subschemas.push(quote!(#internal::variant_subschema(#tag_field_name, #tag_value, #fields_schema, #deny_unknown_fields)));
 	}
 
 	// Combine the subschemas into a single `Option<SubschemaValidation>` object.

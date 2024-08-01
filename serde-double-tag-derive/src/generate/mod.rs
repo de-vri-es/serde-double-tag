@@ -45,6 +45,7 @@ fn variant_tag_value(item: &crate::input::Enum, variant: &crate::input::Variant)
 }
 
 /// Compute the serialized name for a field.
+#[cfg_attr(not(feature = "schemars"), allow(unused))]
 fn field_name(item: &crate::input::Enum, variant: &crate::input::Variant, field: &crate::input::StructField) -> String {
 	if let Some(rename) = &field.attrs.rename {
 		rename.value.value()
